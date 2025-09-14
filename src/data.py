@@ -42,7 +42,7 @@ def load_data(size=28, subsample_train=None, seed=0):
         Xtr = Xtr[indices]
         ytr = ytr[indices]
 
-    # We need to store a the value of the original training statistics
+    # We need to store the value of the original training statistics
     Xtr_original = Xtr.copy()
 
     Xtr = _standardize(Xtr_original, Xtr)
