@@ -20,6 +20,13 @@ def svm_loss(W,X,y,reg=0):
   loss = np.sum(margins) / N #Average loss
   print(loss)
 
-  #TODO: Regularization loss 
+  #TODO: Regularization loss
+  # l2 regularization
+  if reg == 2 :
+    # square the weight of each entry * sum of all rows * sum of columns
+    l2_regularization_loss = np.sum(W**2)
+    accumulated_loss = loss+l2_regularization_loss
+    print(f" accumulated_loss{accumulated_loss}")
+    return accumulated_loss
 
   return loss
