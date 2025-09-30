@@ -1,6 +1,7 @@
 import numpy as np
 from softmax import softmax_loss
 from svm import svm_loss
+from data import load_data
 
 class LinearClassifier:
     """
@@ -15,7 +16,20 @@ class LinearClassifier:
 
     def train(self, X, y, X_val=None, y_val=None, learning_rate=1e-3, reg=1e-5, num_iters=1000, batch_size=200):
         # ToDo
-        pass
+        for it in range(num_iters):
+            x_batch = X
+            y_batch = y
+
+            loss, gradient = None, None
+
+            if self.loss_type == 'softmax':
+                loss, gradient = softmax_loss(self.W, x_batch, y_batch, reg)
+            elif self.loss_type == 'svm':
+                loss, gradient = svm_loss(self.W, x_batch, y_batch, reg)
+
+            self.W -= gradient * learning_rate
+            
+            print(str(it + 1) + "/" + str(num_iters) + " " + str(loss))
 
     def predict(self, X):
         # ToDo
@@ -41,3 +55,9 @@ class LinearClassifier:
             raise ValueError(f'Unknown loss_type: {self.loss_type}')
 
         return loss
+
+
+X_train, y_train, x_val, y_val, _, _ = load_data(size=28, subsample_train=5000)
+classifer = LinearClassifier(28*28, 8, 'softmax') 
+
+classifer.train(X_train, y_train, x_val, y_val, num_iters=200)

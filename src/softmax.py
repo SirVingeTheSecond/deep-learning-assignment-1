@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def softmax_loss(W, X, y, reg=0):
+def softmax_loss(W, X, y, reg=0.0):
     """
     Softmax loss function based on a vectorized implementation.
 
