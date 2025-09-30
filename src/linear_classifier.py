@@ -33,7 +33,11 @@ class LinearClassifier:
 
     def predict(self, X):
         # ToDo
-        pass
+        scores = X.dot(self.W)
+
+        y_pred = np.argmax(scores, axis=1)
+
+        return y_pred
 
     def loss(self, X, y, reg=0.0):
         """
@@ -57,7 +61,14 @@ class LinearClassifier:
         return loss
 
 
-X_train, y_train, x_val, y_val, _, _ = load_data(size=28, subsample_train=5000)
-classifer = LinearClassifier(28*28, 8, 'softmax') 
+X_train, y_train, x_val, y_val, X_test, y_test = load_data(size=28, subsample_train=5000)
+classifer = LinearClassifier(28*28*3+1, 8, 'svm') 
 
-classifer.train(X_train, y_train, x_val, y_val, num_iters=200)
+classifer.train(X_train, y_train, x_val, y_val, num_iters=500)
+
+pred = classifer.predict(X_test)
+
+print(pred)
+
+accuracy = np.mean(pred == y_test) * 100
+print(accuracy)
