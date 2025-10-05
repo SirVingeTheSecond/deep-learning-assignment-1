@@ -5,10 +5,6 @@ from medmnist import BloodMNIST
 def _to_numpy(ds):
     imgs = np.array(ds.imgs)
     y = np.array(ds.labels).ravel().astype(np.int64)
-    #if imgs.ndim == 4 and imgs.shape[-1] == 3:
-    #    imgs = imgs.mean(axis=-1)  # this is based on grayscale
-
-    #append bias
     return imgs, y
 
 
@@ -32,16 +28,12 @@ def load_data(size=28, subsample_train=None, seed=0):
     Xva_img, yva = _to_numpy(va)
     Xte_img, yte = _to_numpy(te)
 
-    # Flatten to vectors
+    # Flatten to vectors (28*28*3 = 2352)
     Xtr = _flatten(Xtr_img)
     Xva = _flatten(Xva_img)
     Xte = _flatten(Xte_img)
 
-    Xtr = np.hstack([Xtr, np.ones((Xtr.shape[0], 1))])
-    Xva = np.hstack([Xva, np.ones((Xva.shape[0], 1))])
-    Xte = np.hstack([Xte, np.ones((Xte.shape[0], 1))])
-
-    # Subsample training data if specified
+    # We can subsample training data
     if subsample_train is not None:
         np.random.seed(seed)
         indices = np.random.choice(Xtr.shape[0], subsample_train, replace=False)
@@ -51,8 +43,14 @@ def load_data(size=28, subsample_train=None, seed=0):
     # We need to store the value of the original training statistics
     Xtr_original = Xtr.copy()
 
+    # Standardize
     Xtr = _standardize(Xtr_original, Xtr)
-    Xva = _standardize(Xtr_original, Xva)  # OG training stats
-    Xte = _standardize(Xtr_original, Xte)  # OG training stats
+    Xva = _standardize(Xtr_original, Xva) # OG training stats
+    Xte = _standardize(Xtr_original, Xte) # OG training stats
+
+    # Bias is added after standardization
+    Xtr = np.hstack([Xtr, np.ones((Xtr.shape[0], 1))])
+    Xva = np.hstack([Xva, np.ones((Xva.shape[0], 1))])
+    Xte = np.hstack([Xte, np.ones((Xte.shape[0], 1))])
 
     return Xtr, ytr, Xva, yva, Xte, yte
