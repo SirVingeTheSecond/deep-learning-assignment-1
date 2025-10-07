@@ -1,109 +1,54 @@
-import medmnist
-from medmnist import BloodMNIST
-import matplotlib.pyplot as plt
-import random
 import numpy as np
+from medmnist import BloodMNIST
 
+def load_data_nn(size=28, subsample_train=1000, subsample_val=1000, seed=0):
+    np.random.seed(seed)
 
-trainDataset = BloodMNIST(split="train", download=True,size=28)
-valDataset = BloodMNIST(split="val", download=True,size=28)
-testDataset = BloodMNIST(split="test", download=True,size=28)
+    # Load splits
+    tr = BloodMNIST(split='train', download=True, size=size)
+    va = BloodMNIST(split='val', download=True, size=size)
+    te = BloodMNIST(split='test', download=True, size=size)
 
-trainImages,trainLabels,trainInfo = trainDataset.__dict__['imgs'],trainDataset.__dict__['labels'],trainDataset.__dict__['info']['label']
+    X_train = tr.imgs
+    y_train = tr.labels.flatten()
+    X_val = va.imgs
+    y_val = va.labels.flatten()
+    X_test = te.imgs
+    y_test = te.labels.flatten()
 
+    # Shuffle up training data
+    train_data = np.random.permutation(X_train.shape[0])
+    X_train = X_train[train_data]
+    y_train = y_train[train_data]
 
-print('Træningsdata:')
-print(f'Billeder: {trainImages.shape}, Labels: {trainLabels.shape}')
+    # Subsample  data
+    if subsample_train is not None:
+        X_train = X_train[:subsample_train]
+        y_train = y_train[:subsample_train]
 
+    if subsample_val is not None:
+        X_val = X_val[:subsample_val]
+        y_val = y_val[:subsample_val]
 
-valImages,valLabels = valDataset.__dict__['imgs'],valDataset.__dict__['labels']
-print('Valideringsdata:')
-print(f'Billeder: {valImages.shape}, Labels: {valLabels.shape}')
+    # Flatten images to vectors
+    X_train = X_train.reshape(X_train.shape[0], -1)
+    X_val = X_val.reshape(X_val.shape[0], -1)
+    X_test = X_test.reshape(X_test.shape[0], -1)
 
-testImages,testLabels = testDataset.__dict__['imgs'],testDataset.__dict__['labels']
-print('Testdata:')
-print(f'Billeder: {testImages.shape}, Labels: {testLabels.shape}')
+    # Preprocessing: subtract the mean image
+    # first: compute the image mean based on the training data
+    mean_image = np.mean(X_train, axis=0)
 
-print('\n')
-print('plot nogle eksempler:')
+    # second: subtract the mean image from train and test data
+    X_train = X_train.astype(np.float32) - mean_image
+    X_val = X_val.astype(np.float32) - mean_image
 
-random.seed(42)
-fig, axes = plt.subplots(5, len(trainInfo), figsize=(15, 5))
+    X_train /= 255.0
+    X_val /= 255.0
+    X_test /= 255.0
 
-for class_,name in trainInfo.items():
-    print(f'klasse: {class_}, klassenavn: {name}. Antal træning samples: {len(trainLabels[trainLabels==int(class_)])}')
-    # Get indices of all images belonging to class i
-    class_indices = [idx for idx, label in enumerate(trainLabels) if int(class_) == label]
-    # Randomly select 5 indices
-    selected_indices = random.sample(class_indices, 5)
-    for j, idx in enumerate(selected_indices):
-        image, label = trainImages[idx],trainLabels[idx]
-        axes[j, int(class_)].imshow(image, cmap='gray')
-        axes[j, int(class_)].axis('off')
-        if j == 0:
-            axes[j, int(class_)].set_title(f'{name[:5]}: {class_}')
+    return X_train, y_train, X_val, y_val, X_test, y_test
 
-plt.tight_layout()
-plt.show()
-
-
-
-#set random seed for reproducibility
-np.random.seed(0)
-
-#Shuffle the data
-randomize = np.arange(trainImages.shape[0])
-np.random.shuffle(randomize)
-
-X_train = trainImages[randomize]
-y_train = trainLabels[randomize].flatten()
-
-randomizeVal = np.arange(valImages.shape[0])
-X_val = valImages[randomizeVal]
-y_val = valLabels[randomizeVal].flatten()
-
-
-# Subsample the data for more efficient code execution in this exercise
-num_training = 5000
-mask = list(range(num_training))
-
-X_train = X_train[mask]
-y_train = y_train[mask]
-
-print('first 10 examples in train: ',y_train[:10])
-
-num_val = 500
-mask = list(range(num_val))
-X_val = X_val[mask]
-y_val = y_val[mask]
-
-print('first 10 examples in val: ',y_val[:10])
-
-# Reshape the image data into rows for effecient distance calculation
-#(vi tager billedet med dimensioner 28x28x3 og strækker det ud til en vektor med længden 28*28*3 = 2352)
-X_train = np.reshape(X_train, (X_train.shape[0], -1))
-X_val = np.reshape(X_val, (X_val.shape[0], -1))
-print(f'New train shape: {X_train.shape}')
-print(f'New val shape: {X_val.shape}')
-
-# Preprocessing: subtract the mean image
-# first: compute the image mean based on the training data
-mean_image = np.mean(X_train, axis=0)
-print(mean_image[:10]) # print a few of the elements
-plt.figure(figsize=(4,4))
-plt.imshow(mean_image.reshape((28,28,3)).astype('uint8')) # visualize the mean image
-plt.show()
-
-# second: subtract the mean image from train and test data
-X_train = X_train.astype(np.float32)-mean_image
-X_val = X_val.astype(np.float32)-mean_image
-
-print(X_train.min(),X_train.max())
-
-print(X_train.shape, X_val.shape)
-
-X_train /= 255.
-X_val /= 255.
 
 
 class FullyConnectedNN:
