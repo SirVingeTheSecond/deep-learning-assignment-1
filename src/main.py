@@ -134,6 +134,7 @@ def plot_training_curves(hist, title, filename):
     print(f"Saved plot: {filename}")
 
 
+# Use seaborn library instead?
 def plot_confusion_matrix(y_true, y_pred, title, filename):
     cm = confusion_matrix(y_true, y_pred)
     plt.figure(figsize=(10, 8))
