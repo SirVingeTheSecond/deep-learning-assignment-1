@@ -62,7 +62,7 @@ def plot_knn_validation_and_class_distribution(
     plt.grid(True, alpha=0.3, axis='y')
 
     for bar, diff in zip(bars, acc_diff):
-        if abs(diff) > 0.5:  # Only label significant differences
+        if abs(diff) > 0.5: # Only label significant differences
             plt.text(
                 bar.get_x() + bar.get_width() / 2,
                 bar.get_height() + (0.3 if diff > 0 else -0.5),
@@ -110,7 +110,7 @@ def plot_training_curves(hist, title, filename):
         plt.plot(iterations, loss_history, alpha=0.3, color='blue', linewidth=0.5, label="Batch loss (raw)")
 
         # Plot smoothed loss using moving average
-        window_size = max(len(loss_history) // 50, 10)  # Adaptive window
+        window_size = max(len(loss_history) // 50, 10)
         smoothed_loss = np.convolve(loss_history, np.ones(window_size) / window_size, mode='valid')
         smoothed_iterations = iterations[:len(smoothed_loss)]
         plt.plot(smoothed_iterations, smoothed_loss, color='blue', linewidth=2, label="Loss (smoothed)")
@@ -164,7 +164,7 @@ def main():
     os.makedirs(plots_dir, exist_ok=True)
 
     print("Loading data...")
-    X_train, y_train, X_val, y_val, X_test, y_test = load_data(size=28, subsample_train=500)
+    X_train, y_train, X_val, y_val, X_test, y_test = load_data(size=28, subsample_train=5000)
 
     print(f"Dataset: {X_train.shape[0]} train, {X_val.shape[0]} val, {X_test.shape[0]} test")
     print(f"Features: {X_train.shape[1]}, Classes: {len(np.unique(y_train))}")
