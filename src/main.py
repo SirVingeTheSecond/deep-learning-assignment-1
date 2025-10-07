@@ -101,20 +101,35 @@ def plot_knn_validation_and_class_distribution(
 
 def plot_training_curves(hist, title, filename):
     plt.figure(figsize=(7, 4))
+
     if "loss_history" in hist and len(hist["loss_history"]) > 0:
-        plt.plot(hist["loss_history"], label="Batch loss")
+        loss_history = hist["loss_history"]
+        iterations = np.arange(len(loss_history))
+
+        # Plot raw batch loss (noisy)
+        plt.plot(iterations, loss_history, alpha=0.3, color='blue', linewidth=0.5, label="Batch loss (raw)")
+
+        # Plot smoothed loss using moving average
+        window_size = max(len(loss_history) // 50, 10)  # Adaptive window
+        smoothed_loss = np.convolve(loss_history, np.ones(window_size) / window_size, mode='valid')
+        smoothed_iterations = iterations[:len(smoothed_loss)]
+        plt.plot(smoothed_iterations, smoothed_loss, color='blue', linewidth=2, label="Loss (smoothed)")
 
     if "train_acc_history" in hist and len(hist["train_acc_history"]) > 0:
         x_train = np.linspace(0, len(hist["loss_history"]), num=len(hist["train_acc_history"]))
-        plt.plot(x_train, hist["train_acc_history"], label="Train acc (epoch)")
+        plt.plot(x_train, hist["train_acc_history"], color='orange', linewidth=2, label="Train acc (epoch)")
+
     if "val_acc_history" in hist and len(hist["val_acc_history"]) > 0:
         x_val = np.linspace(0, len(hist["loss_history"]), num=len(hist["val_acc_history"]))
-        plt.plot(x_val, hist["val_acc_history"], label="Val acc (epoch)")
+        plt.plot(x_val, hist["val_acc_history"], color='green', linewidth=2, label="Val acc (epoch)")
+
     plt.xlabel("Iteration")
+    plt.ylabel("Loss / Accuracy")
     plt.title(title)
     plt.legend()
+    plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig(filename)
+    plt.savefig(filename, dpi=300, bbox_inches='tight')
     plt.close()
     print(f"Saved plot: {filename}")
 
