@@ -50,7 +50,6 @@ def load_data_nn(size=28, subsample_train=1000, subsample_val=1000, seed=0):
     return X_train, y_train, X_val, y_val, X_test, y_test
 
 
-
 class FullyConnectedNN:
     def __init__(self, layers, reg_strength=0.01, loss='softmax', seed=42):
         """
@@ -170,10 +169,19 @@ class FullyConnectedNN:
                 vW_hat = v['vW' + str(i)] / (1 - beta2**t)
                 self.params['W' + str(i)] -= learning_rate * mW_hat / (np.sqrt(vW_hat) + 1e-8)
 
-    def fit(self, X, y, epochs=100, batch_size=64, learning_rate=0.01, optimizer='sgd'):
+    def train(self, X, y, X_val=None, y_val=None, learning_rate=0.01, reg=0.01,
+              num_iters=200, batch_size=64, optimizer='sgd', print_every=100):
         """
         Trains the model using the chosen optimizer.
         """
+        self.reg_strength = reg
+        num_train = X.shape[0]
+        iterations_per_epoch = max(num_train // batch_size, 1)
+
+        loss_history=[]
+        train_acc_history=[]
+        val_acc_history=[]
+
         v = None
         if optimizer in ['momentum', 'adam']:
             v = {}
@@ -184,22 +192,28 @@ class FullyConnectedNN:
                     v['mW' + str(i)] = np.zeros_like(self.params['W' + str(i)])
                     v['vW' + str(i)] = np.zeros_like(self.params['W' + str(i)])
 
-        for epoch in range(epochs):
-            permutation = np.random.permutation(X.shape[0])
-            X_shuffled = X[permutation]
-            y_shuffled = y[permutation]
+        for it in range(num_iters):
+            # Sample minibatch
+            batch_indices = np.random.choice(num_train, batch_size, replace=True)
+            X_batch = X[batch_indices]
+            y_batch = y[batch_indices]
 
-            for i in range(0, X.shape[0], batch_size):
-                X_batch = X_shuffled[i:i + batch_size]
-                y_batch = y_shuffled[i:i + batch_size]
+            A_last, cache = self.forward(X_batch)
+            loss = self.compute_loss(A_last, y_batch)
+            grads = self.backward(cache, y_batch)
 
-                A_last, cache = self.forward(X_batch)
-                loss = self.compute_loss(A_last, y_batch)
-                grads = self.backward(cache, y_batch)
-                self.update_params(grads, learning_rate, v=v, optimizer=optimizer)
+            self.update_params(grads, learning_rate, v=v, optimizer=optimizer)
 
-            if epoch % 10 == 0:
-                print(f'Epoch {epoch}, Loss: {loss}')
+            loss_history.append(loss)
+
+            if (it + 1) % print_every == 0:
+                print(str(it + 1) + "/" + str(num_iters) + " " + str(loss))
+
+        return {
+            'loss_history': loss_history,
+            'train_acc_history': train_acc_history,
+            'val_acc_history': val_acc_history,
+        }
 
     def predict(self, X):
         A_last, _ = self.forward(X)
@@ -207,11 +221,7 @@ class FullyConnectedNN:
             return np.argmax(A_last, axis=1)
         elif self.loss_type == 'hinge':
             return np.argmax(A_last, axis=1)
-        
-    # Example usage:
-    # To-lags neuralt netværk med input lag med antal neuroner svarende til input
-    # størrelsen, ét "hidden" lag med 200 neuroner, og et output lag
-    # med antal neuroner = antallet af klasser i datasættet.
+
 
 nn = FullyConnectedNN(layers=[X_train.shape[1], 500, 8], loss='softmax')
 
