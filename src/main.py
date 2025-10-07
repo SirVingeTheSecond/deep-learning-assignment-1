@@ -9,20 +9,48 @@ from k_nearest_neighbor import KNearestNeighbor
 from linear_classifier import LinearClassifier
 
 class_names = [
-    'basophil',
-    'eosinophil',
-    'erythroblast',
-    'immature granulocyte',
-    'lymphocyte',
-    'monocyte',
-    'neutrophil',
-    'platelet',
+    'Basop',
+    'Eosin',
+    'Eryth',
+    'Immat',
+    'Lymph',
+    'Monoc',
+    'Neutr',
+    'Plate',
 ]
 
 SEED = 42
 np.random.seed(SEED)
 random.seed(SEED)
 
+def plot_class_distribution(plots_dir, y_train, y_test, y_val):
+    plt.plot()
+    train_classes, train_counts = np.unique(y_train, return_counts=True)
+    test_classes, test_counts = np.unique(y_test, return_counts=True)
+    val_classes, val_counts = np.unique(y_val, return_counts=True)
+
+    train_percentages = train_counts / len(y_train) * 100
+    test_percentages = test_counts / len(y_test) * 100
+    val_percentages = val_counts / len(y_val) * 100
+
+    x = np.arange(len(train_classes))
+    width = 0.2
+    plt.bar(x - width * 1.1, train_percentages, width, label='Training', alpha=0.8)
+    plt.bar(x, test_percentages, width, label='Test', alpha=0.8)
+    plt.bar(x + width * 1.1, val_percentages, width, label='Validation', alpha=0.8)
+    
+
+    plt.xlabel('Class')
+    plt.ylabel('Percentage (%)')
+    plt.title('Class distribution')
+    plt.xticks(x, [f'{class_names[i]}' for i in train_classes], rotation=20)
+    plt.legend()
+    plt.grid(True, alpha=0.3, axis='y')
+
+    plt.tight_layout()
+    out = f"{plots_dir}/dataset_class_distribution.png"
+    plt.savefig(out, dpi=300, bbox_inches='tight')
+    plt.close()
 
 def plot_knn_validation_and_class_distribution(
         plots_dir, k_values, acc_L2, acc_L1, best_params, y_train, y_test
@@ -170,6 +198,8 @@ def main():
     print(f"Dataset: {X_train.shape[0]} train, {X_val.shape[0]} val, {X_test.shape[0]} test")
     print(f"Features: {X_train.shape[1]}, Classes: {len(np.unique(y_train))}")
     print()
+
+    plot_class_distribution(plots_dir, y_train, y_test, y_val)
 
     # =========================
     # PART 1: kNN

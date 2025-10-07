@@ -1,5 +1,8 @@
+import os
 import numpy as np
 from medmnist import BloodMNIST
+import matplotlib.pyplot as plt
+import random
 
 
 def _to_numpy(ds):
@@ -17,12 +20,40 @@ def _standardize(x_ref, x):
     sd = x_ref.std(axis=0, keepdims=True) + 1e-8 # so we do not divide by zero
     return (x - mu) / sd
 
+def plot_example_images(tr):
+    plots_dir = "../plots"
+    os.makedirs(plots_dir, exist_ok=True)
+
+    trainImages,trainLabels,trainInfo = tr.__dict__['imgs'],tr.__dict__['labels'],tr.__dict__['info']['label']
+
+    random.seed(42)
+    fig, axes = plt.subplots(5, len(trainInfo), figsize=(15, 5))
+
+    for class_,name in trainInfo.items():
+        # Get indices of all images belonging to class i
+        class_indices = [idx for idx, label in enumerate(trainLabels) if int(class_) == label]
+        # Randomly select 5 indices
+        selected_indices = random.sample(class_indices, 5)
+        for j, idx in enumerate(selected_indices):
+            image, label = trainImages[idx],trainLabels[idx]
+            axes[j, int(class_)].imshow(image, cmap='gray')
+            axes[j, int(class_)].axis('off')
+            if j == 0:
+                axes[j, int(class_)].set_title(f'{name[:5]}: {class_}')
+
+    plt.tight_layout()
+    out = f"{plots_dir}/example_images.png"
+    plt.savefig(out, dpi=300, bbox_inches='tight')
+    plt.close()
+
 
 def load_data(size=28, subsample_train=None, seed=0):
     # DO THE SPLITS
     tr = BloodMNIST(split="train", download=True, size=size)
     va = BloodMNIST(split="val", download=True, size=size)
     te = BloodMNIST(split="test", download=True, size=size)
+
+    plot_example_images(tr)
 
     Xtr_img, ytr = _to_numpy(tr)
     Xva_img, yva = _to_numpy(va)
