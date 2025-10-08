@@ -1,10 +1,13 @@
 import numpy as np
-import os
 from medmnist import BloodMNIST
 
-# plotting is only used by the demo; import inside main if not available
 
 def load_data_nn(size=28, subsample_train=1000, subsample_val=1000, seed=0):
+    """
+    Load and preprocess data for neural network training.
+    Uses mean centering and /255 scaling (different from linear classifiers).
+    Does NOT add bias column since NN has separate bias parameters.
+    """
     np.random.seed(seed)
 
     # Load splits
@@ -24,7 +27,7 @@ def load_data_nn(size=28, subsample_train=1000, subsample_val=1000, seed=0):
     X_train = X_train[train_data]
     y_train = y_train[train_data]
 
-    # Subsample  data
+    # Subsample data
     if subsample_train is not None:
         X_train = X_train[:subsample_train]
         y_train = y_train[:subsample_train]
@@ -78,17 +81,37 @@ class FullyConnectedNN:
         """
         params = {}
         for i in range(1, len(layers)):
-            params['W' + str(i)] = np.random.randn(layers[i-1], layers[i]) * 0.01
+            params['W' + str(i)] = np.random.randn(layers[i - 1], layers[i]) * 0.01
             params['b' + str(i)] = np.zeros((1, layers[i]))
         return params
 
     def relu(self, Z):
+        """
+        ReLU (Rectified Linear Unit) activation function.
+        Used in hidden layers because it:
+        - Introduces non-linearity (allows network to learn complex patterns)
+        - Avoids vanishing gradient problem (unlike sigmoid/tanh)
+        - Computationally efficient
+        """
         return np.maximum(0, Z)
 
     def relu_derivative(self, Z):
+        """
+        Derivative of ReLU for backpropagation.
+        Simply 1 if Z > 0, else 0
+        """
         return Z > 0
 
     def softmax(self, Z):
+        """
+        Softmax activation for output layer in multi-class classification.
+        Converts raw scores to probabilities that sum to 1.
+
+        Numerical stability trick: subtract max before exp to prevent overflow
+        This doesn't change the output because:
+        softmax(Z) = exp(Z) / sum(exp(Z))
+                   = exp(Z - max(Z)) / sum(exp(Z - max(Z)))
+        """
         exp_Z = np.exp(Z - np.max(Z, axis=1, keepdims=True))
         return exp_Z / np.sum(exp_Z, axis=1, keepdims=True)
 
@@ -134,12 +157,25 @@ class FullyConnectedNN:
         return A, cache
 
     def backward(self, cache, y):
+        """
+        Backward pass: compute gradients using chain rule.
+
+        The backpropagation algorithm:
+        1. Compute gradient of loss w.r.t. output layer
+        2. Propagate this gradient backwards through each layer
+        3. At each layer, compute gradients w.r.t. weights and biases
+        4. Use chain rule: dL/dW = dL/dA * dA/dZ * dZ/dW
+
+        For softmax + cross-entropy loss, the gradient simplifies to:
+        dL/dZ = (predicted_probs - true_labels) / batch_size
+        """
         grads = {}
         m = y.shape[0]
         A_last = cache['A' + str(len(self.layers) - 1)]
         if self.loss_type == 'softmax':
+            # Softmax + cross-entropy gradient simplifies elegantly
             dA = self.softmax(A_last)
-            dA[range(m), y] -= 1
+            dA[range(m), y] -= 1  # Subtract 1 from true class probability
             dA /= m
         elif self.loss_type == 'hinge':
             margins = (A_last - A_last[range(m), y].reshape(-1, 1) + 1) > 0
@@ -147,12 +183,16 @@ class FullyConnectedNN:
             dA = np.where(margins, 1, 0)
             dA /= m
 
+        # Backpropagate through layers using chain rule
         for i in reversed(range(1, len(self.layers))):
             dZ = dA
             A_prev = cache['A' + str(i - 1)]
+            # Gradient w.r.t. weights: dL/dW = A_prev^T * dZ + regularization term
             grads['W' + str(i)] = np.dot(A_prev.T, dZ) + self.reg_strength * self.params['W' + str(i)]
+            # Gradient w.r.t. biases: dL/db = sum of dZ across batch
             grads['b' + str(i)] = np.sum(dZ, axis=0, keepdims=True)
             if i > 1:
+                # Chain rule: multiply by derivative of ReLU activation
                 dA = np.dot(dZ, self.params['W' + str(i)].T) * self.relu_derivative(cache['Z' + str(i - 1)])
 
         return grads
@@ -161,6 +201,22 @@ class FullyConnectedNN:
         """
         Updates parameters with chosen optimization method.
         If optimizer is 'momentum' or 'adam', it requires v for velocity and also t for time step in adam.
+
+        SGD (Stochastic Gradient Descent):
+        - Simple: W = W - learning_rate * gradient
+        - Can oscillate and converge slowly
+
+        Momentum:
+        - Accumulates velocity (exponential moving average of gradients)
+        - Helps accelerate in relevant directions and dampen oscillations
+        - Formula: v = beta * v + (1-beta) * gradient
+        -          W = W - learning_rate * v
+
+        Adam (Adaptive Moment Estimation):
+        - Maintains both first moment (mean) and second moment (variance) of gradients
+        - Adapts learning rate for each parameter
+        - Generally converges faster and more reliably
+        - Combines benefits of momentum and RMSprop
         """
         for i in range(1, len(self.layers)):
             if optimizer == 'sgd':
@@ -202,9 +258,9 @@ class FullyConnectedNN:
         num_train = X.shape[0]
         iterations_per_epoch = max(num_train // batch_size, 1)
 
-        loss_history=[]
-        train_acc_history=[]
-        val_acc_history=[]
+        loss_history = []
+        train_acc_history = []
+        val_acc_history = []
 
         v = None
         if optimizer in ['momentum', 'adam']:
@@ -230,7 +286,7 @@ class FullyConnectedNN:
             grads = self.backward(cache, y_batch)
 
             # pass current time-step to optimizer (used by Adam for bias-correction)
-            self.update_params(grads, learning_rate, v=v, optimizer=optimizer, t=it+1)
+            self.update_params(grads, learning_rate, v=v, optimizer=optimizer, t=it + 1)
 
             loss_history.append(loss)
 
@@ -243,7 +299,7 @@ class FullyConnectedNN:
                     val_acc_history.append(val_acc)
 
             if (it + 1) % print_every == 0:
-                msg = f"{it+1}/{num_iters} loss={loss:.4f}"
+                msg = f"{it + 1}/{num_iters} loss={loss:.4f}"
                 if len(train_acc_history):
                     msg += f" train_acc={train_acc_history[-1]:.4f}"
                 if len(val_acc_history):
@@ -264,56 +320,53 @@ class FullyConnectedNN:
             return np.argmax(A_last, axis=1)
 
 
-if __name__ == '__main__':
-    # sumsamlpe demo
-    X_train, y_train, X_val, y_val, X_test, y_test = load_data_nn(subsample_train=2000, subsample_val=500)
-
-    nn = FullyConnectedNN(layers=[X_train.shape[1], 500, 8], loss='softmax')
-
-    # train the network
-    history = nn.train(X_train, y_train, X_val=X_val, y_val=y_val,
-                       learning_rate=1e-3, reg=1e-3, num_iters=2000,
-                       batch_size=128, optimizer='adam', print_every=200)
-
-    # final accuracies
-    train_acc = np.mean(nn.predict(X_train) == y_train)
-    val_acc = np.mean(nn.predict(X_val) == y_val)
-    print(f'Final Training accuracy={train_acc:.4f}')
-    print(f'Final Validation accuracy={val_acc:.4f}')
-
-    # create plots folder
-    plots_dir = os.path.join(os.path.dirname(__file__), '..', 'plots')
-    os.makedirs(plots_dir, exist_ok=True)
-
-    # Plottin with matplotlib 
-    try:
-        import matplotlib.pyplot as plt
-
-        plt.figure(figsize=(8, 4))
-        plt.plot(history['loss_history'])
-        plt.title('Training loss')
-        plt.xlabel('Iteration')
-        plt.ylabel('Loss')
-        plt.grid(True)
-        plt.tight_layout()
-        plt.savefig(os.path.join(plots_dir, 'nn_training_loss.png'))
-        plt.close()
-
-        if len(history['train_acc_history']) > 0:
-            plt.figure(figsize=(8, 4))
-            plt.plot(history['train_acc_history'], label='train')
-            if len(history['val_acc_history']):
-                plt.plot(history['val_acc_history'], label='val')
-            plt.title('Accuracy per epoch')
-            plt.xlabel('Epoch')
-            plt.ylabel('Accuracy')
-            plt.legend()
-            plt.grid(True)
-            plt.tight_layout()
-            plt.savefig(os.path.join(plots_dir, 'nn_accuracy.png'))
-            plt.close()
-    except Exception:
-        print('matplotlib not available; skipping plots')
-
-
-
+# if __name__ == '__main__':
+#     # subsample demo
+#     X_train, y_train, X_val, y_val, X_test, y_test = load_data_nn(subsample_train=2000, subsample_val=500)
+#
+#     nn = FullyConnectedNN(layers=[X_train.shape[1], 500, 8], loss='softmax')
+#
+#     # train the network
+#     history = nn.train(X_train, y_train, X_val=X_val, y_val=y_val,
+#                        learning_rate=1e-3, reg=1e-3, num_iters=2000,
+#                        batch_size=128, optimizer='adam', print_every=200)
+#
+#     # final accuracies
+#     train_acc = np.mean(nn.predict(X_train) == y_train)
+#     val_acc = np.mean(nn.predict(X_val) == y_val)
+#     print(f'Final Training accuracy={train_acc:.4f}')
+#     print(f'Final Validation accuracy={val_acc:.4f}')
+#
+#     # create plots folder
+#     plots_dir = os.path.join(os.path.dirname(__file__), '..', 'plots')
+#     os.makedirs(plots_dir, exist_ok=True)
+#
+#     # Plotting with matplotlib
+#     try:
+#         import matplotlib.pyplot as plt
+#
+#         plt.figure(figsize=(8, 4))
+#         plt.plot(history['loss_history'])
+#         plt.title('Training loss')
+#         plt.xlabel('Iteration')
+#         plt.ylabel('Loss')
+#         plt.grid(True)
+#         plt.tight_layout()
+#         plt.savefig(os.path.join(plots_dir, 'nn_training_loss.png'))
+#         plt.close()
+#
+#         if len(history['train_acc_history']) > 0:
+#             plt.figure(figsize=(8, 4))
+#             plt.plot(history['train_acc_history'], label='train')
+#             if len(history['val_acc_history']):
+#                 plt.plot(history['val_acc_history'], label='val')
+#             plt.title('Accuracy per epoch')
+#             plt.xlabel('Epoch')
+#             plt.ylabel('Accuracy')
+#             plt.legend()
+#             plt.grid(True)
+#             plt.tight_layout()
+#             plt.savefig(os.path.join(plots_dir, 'nn_accuracy.png'))
+#             plt.close()
+#     except Exception:
+#         print('matplotlib not available; skipping plots')
