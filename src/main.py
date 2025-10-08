@@ -2,6 +2,29 @@ import os
 import numpy as np
 import random
 
+from config import (
+    config,
+    SEED,
+    DATA_SIZE,
+    SUBSAMPLE_TRAIN,
+    SUBSAMPLE_VAL,
+    PLOTS_DIR,
+    CLASS_NAMES,
+    KNN_K_VALUES,
+    KNN_DISTANCE_METRICS,
+    LINEAR_LEARNING_RATES,
+    LINEAR_REGULARIZATIONS,
+    LINEAR_NUM_ITERS,
+    LINEAR_BATCH_SIZE,
+    LINEAR_PRINT_EVERY,
+    NN_HIDDEN_SIZES,
+    NN_LEARNING_RATES,
+    NN_REGULARIZATIONS,
+    NN_OPTIMIZERS,
+    NN_NUM_ITERS,
+    NN_BATCH_SIZE,
+    NN_PRINT_EVERY,
+)
 from data import load_data
 from k_nearest_neighbor import KNearestNeighbor
 from linear_classifier import LinearClassifier
@@ -13,22 +36,8 @@ from plot import (
     plot_nn_hyperparameter_results,
     plot_model_comparison,
     visualize_nn_weights,
-    plot_nn_training_loss,
-    plot_nn_accuracy_per_epoch
 )
 
-class_names = [
-    'Basop',
-    'Eosin',
-    'Eryth',
-    'Immat',
-    'Lymph',
-    'Monoc',
-    'Neutr',
-    'Plate',
-]
-
-SEED = 42
 np.random.seed(SEED)
 random.seed(SEED)
 
@@ -42,9 +51,6 @@ def run_knn(X_train, y_train, X_val, y_val, X_test, y_test, plots_dir):
     knn = KNearestNeighbor()
     knn.train(X_train, y_train)
 
-    k_values = [1, 3, 5, 7, 13, 21, 33, 45, 55, 67, 79, 91, 111, 131, 149, 167, 193, 201]
-    distance_metrics = ['L2', 'L1']
-
     print("Hyperparameter tuning results:")
     print("k\tL2 accuracy\tL1 accuracy")
     print("-" * 35)
@@ -54,9 +60,9 @@ def run_knn(X_train, y_train, X_val, y_val, X_test, y_test, plots_dir):
     best_accuracy = 0.0
     best_params = {}
 
-    for k in k_values:
+    for k in KNN_K_VALUES:
         results = {}
-        for metric in distance_metrics:
+        for metric in KNN_DISTANCE_METRICS:
             preds = knn.predict(X_val, k=k, metric=metric)
             acc = np.mean(preds == y_val) * 100
             results[metric] = acc
@@ -68,7 +74,7 @@ def run_knn(X_train, y_train, X_val, y_val, X_test, y_test, plots_dir):
         print(f"{k}\t{results['L2']:.1f}%\t\t{results['L1']:.1f}%")
 
     plot_knn_validation_and_class_distribution(
-        plots_dir, k_values, acc_L2, acc_L1, best_params, y_train, y_test
+        plots_dir, KNN_K_VALUES, acc_L2, acc_L1, best_params, y_train, y_test
     )
 
     print(f"\nBest: k={best_params['k']}, {best_params['metric']} ({best_accuracy:.1f}%)")
@@ -107,8 +113,7 @@ def run_linear_classifiers(X_train, y_train, X_val, y_val, X_test, y_test, plots
     print("PART 2: Linear Classifiers")
     print("=" * 60)
 
-    def run_grid(loss_type, Xtr, ytr, Xva, yva,
-                 lrs, regs, num_iters=200, batch_size=200, print_every=100):
+    def run_grid(loss_type, Xtr, ytr, Xva, yva, lrs, regs, num_iters, batch_size, print_every):
         best_val = -1.0
         best_tuple = None
         best_hist = None
@@ -144,13 +149,11 @@ def run_linear_classifiers(X_train, y_train, X_val, y_val, X_test, y_test, plots
         print(f"\nBest {loss_type.capitalize()}: lr={lr}, reg={reg} ({best_val * 100:.2f}%)\n")
         return clf, lr, reg, best_hist
 
-    lrs = [1e-4, 5e-4, 1e-3]
-    regs = [1e-4, 5e-4, 1e-3, 5e-3]
-
     # SVM
     svm_model, best_lr_svm, best_reg_svm, svm_hist = run_grid(
         "svm", X_train, y_train, X_val, y_val,
-        lrs, regs, num_iters=200, batch_size=200, print_every=100
+        LINEAR_LEARNING_RATES, LINEAR_REGULARIZATIONS,
+        LINEAR_NUM_ITERS, LINEAR_BATCH_SIZE, LINEAR_PRINT_EVERY
     )
     y_test_pred_svm = svm_model.predict(X_test)
     svm_test_acc = np.mean(y_test_pred_svm == y_test) * 100
@@ -159,7 +162,8 @@ def run_linear_classifiers(X_train, y_train, X_val, y_val, X_test, y_test, plots
     # Softmax
     softmax_model, best_lr_soft, best_reg_soft, softmax_hist = run_grid(
         "softmax", X_train, y_train, X_val, y_val,
-        lrs, regs, num_iters=200, batch_size=200, print_every=100
+        LINEAR_LEARNING_RATES, LINEAR_REGULARIZATIONS,
+        LINEAR_NUM_ITERS, LINEAR_BATCH_SIZE, LINEAR_PRINT_EVERY
     )
     y_test_pred_soft = softmax_model.predict(X_test)
     softmax_test_acc = np.mean(y_test_pred_soft == y_test) * 100
@@ -205,7 +209,7 @@ def run_neural_network(X_train_nn, y_train_nn, X_val_nn, y_val_nn, X_test_nn, y_
     print(f"NN data shapes: {X_train_nn.shape}, {X_val_nn.shape}, {X_test_nn.shape}")
 
     def run_nn_grid(Xtr, ytr, Xva, yva, hidden_sizes, lrs, regs, optimizers,
-                    num_iters=200, batch_size=64, print_every=100):
+                    num_iters, batch_size, print_every):
         """
         Hyperparameter search for neural network.
         Similar to run_grid for linear classifiers but with more hyperparameters.
@@ -249,7 +253,7 @@ def run_neural_network(X_train_nn, y_train_nn, X_val_nn, y_val_nn, X_test_nn, y_
 
                         print(f"{hidden_size}\t{lr:<7g}\t{reg:<7g}\t{opt}\t\t{val_acc * 100:.2f}%")
 
-                        # Track all results for visualization
+                        # Track the results
                         all_results.append({
                             'hidden': hidden_size,
                             'lr': lr,
@@ -267,44 +271,31 @@ def run_neural_network(X_train_nn, y_train_nn, X_val_nn, y_val_nn, X_test_nn, y_
         print(f"\nBest NN: hidden={h_size}, lr={lr}, reg={reg}, opt={opt} ({best_val * 100:.2f}%)\n")
         return nn, h_size, lr, reg, opt, best_hist, all_results
 
-    # Grid search parameters
-    hidden_sizes = [100, 200, 500]
-    nn_lrs = [0.001, 0.005, 0.01]
-    nn_regs = [0.0001, 0.001, 0.01]
-    optimizers = ['sgd', 'momentum', 'adam']
-
+    # Grid search
     nn_model, best_hidden, best_lr_nn, best_reg_nn, best_opt, nn_hist, nn_results = run_nn_grid(
         X_train_nn, y_train_nn, X_val_nn, y_val_nn,
-        hidden_sizes, nn_lrs, nn_regs, optimizers,
-        num_iters=200, batch_size=64, print_every=100
+        NN_HIDDEN_SIZES, NN_LEARNING_RATES, NN_REGULARIZATIONS, NN_OPTIMIZERS,
+        NN_NUM_ITERS, NN_BATCH_SIZE, NN_PRINT_EVERY
     )
 
     y_test_pred_nn = nn_model.predict(X_test_nn)
     nn_test_acc = np.mean(y_test_pred_nn == y_test_nn) * 100
     print(f"Final Neural Network test accuracy: {nn_test_acc:.2f}%")
 
-    # Visualize hyperparameter tuning results
     plot_nn_hyperparameter_results(nn_results, plots_dir)
 
-    # Training curves for neural network
-    #plot_training_curves(nn_hist, "Neural Network Training (loss + epoch acc)", f"{plots_dir}/nn_training_curves.png")
-
-    # Confusion matrix for neural network
     plot_confusion_matrix(y_test_nn, y_test_pred_nn, "Neural Network Confusion Matrix",
                           f"{plots_dir}/10_nn_confusion_matrix.png")
 
-    # Visualize learned weights
     visualize_nn_weights(nn_model, f"{plots_dir}/11_nn_learned_weights.png")
 
-    # Per class accuracy analysis
     print("\nPer-class accuracy on test set:")
-    for i, class_name in enumerate(class_names):
+    for i, class_name in enumerate(CLASS_NAMES):
         class_mask = y_test_nn == i
         if np.sum(class_mask) > 0:
             class_acc = np.mean(y_test_pred_nn[class_mask] == y_test_nn[class_mask]) * 100
             print(f"  {class_name:25s}: {class_acc:5.2f}% ({np.sum(class_mask):4d} samples)")
 
-    # statistics for neural network
     total_params = sum(p.size for p in nn_model.params.values())
     print(f"\nNeural Network statistics:")
     print(f"  Architecture: {nn_model.layers}")
@@ -336,18 +327,11 @@ def run_neural_network(X_train_nn, y_train_nn, X_val_nn, y_val_nn, X_test_nn, y_
 
 
 def main():
-    # Configuration: which models to run
-    config = {
-        'run_knn': False,
-        'run_linear': False,
-        'run_nn': True,
-    }
-
-    plots_dir = "../plots"
+    plots_dir = PLOTS_DIR
     os.makedirs(plots_dir, exist_ok=True)
 
     print("Loading data...")
-    X_train, y_train, X_val, y_val, X_test, y_test = load_data(size=28, subsample_train=5000)
+    X_train, y_train, X_val, y_val, X_test, y_test = load_data(size=DATA_SIZE, subsample_train=SUBSAMPLE_TRAIN)
 
     print(f"Dataset: {X_train.shape[0]} train, {X_val.shape[0]} val, {X_test.shape[0]} test")
     print(f"Features: {X_train.shape[1]}, Classes: {len(np.unique(y_train))}")
@@ -374,7 +358,7 @@ def main():
     # Run Neural Network
     if config['run_nn']:
         X_train_nn, y_train_nn, X_val_nn, y_val_nn, X_test_nn, y_test_nn = load_data_nn(
-            size=28, subsample_train=5000, subsample_val=500, seed=SEED
+            size=DATA_SIZE, subsample_train=SUBSAMPLE_TRAIN, subsample_val=SUBSAMPLE_VAL, seed=SEED
         )
         results['nn'] = run_neural_network(
             X_train_nn, y_train_nn, X_val_nn, y_val_nn, X_test_nn, y_test_nn,
