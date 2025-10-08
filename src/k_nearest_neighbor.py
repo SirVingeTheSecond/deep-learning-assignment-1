@@ -1,3 +1,4 @@
+from scipy.spatial.distance import cdist
 import numpy as np
 
 ################################################
@@ -36,8 +37,10 @@ class KNearestNeighbor:
 
         elif metric == 'L1':
             # L1 (Manhattan) distance
-            for i in range(n_test):
-                distances[i] = np.sum(np.abs(self.X_train - X_test[i]), axis=1)
+            distances = cdist(X_test, self.X_train, metric='cityblock')
+            # Slow as hell due to not being vectorized
+            # for i in range(n_test):
+            #     distances[i] = np.sum(np.abs(self.X_train - X_test[i]), axis=1)
         else:
             raise ValueError("Distance metric must be 'L1' or 'L2'")
 

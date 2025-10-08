@@ -1,214 +1,55 @@
 import os
 import numpy as np
 import random
-import matplotlib.pyplot as plt
-from sklearn.metrics import confusion_matrix
 
+from config import (
+    config,
+    SEED,
+    DATA_SIZE,
+    SUBSAMPLE_TRAIN,
+    SUBSAMPLE_VAL,
+    PLOTS_DIR,
+    CLASS_NAMES,
+    KNN_K_VALUES,
+    KNN_DISTANCE_METRICS,
+    LINEAR_LEARNING_RATES,
+    LINEAR_REGULARIZATIONS,
+    LINEAR_NUM_ITERS,
+    LINEAR_BATCH_SIZE,
+    LINEAR_PRINT_EVERY,
+    NN_HIDDEN_SIZES,
+    NN_LEARNING_RATES,
+    NN_REGULARIZATIONS,
+    NN_OPTIMIZERS,
+    NN_NUM_ITERS,
+    NN_BATCH_SIZE,
+    NN_PRINT_EVERY,
+)
 from data import load_data
 from k_nearest_neighbor import KNearestNeighbor
 from linear_classifier import LinearClassifier
+from neural_network import FullyConnectedNN, load_data_nn
+from plot import (
+    plot_knn_validation_and_class_distribution,
+    plot_training_curves,
+    plot_confusion_matrix,
+    plot_nn_hyperparameter_results,
+    plot_model_comparison,
+    visualize_nn_weights,
+)
 
-class_names = [
-    'Basop',
-    'Eosin',
-    'Eryth',
-    'Immat',
-    'Lymph',
-    'Monoc',
-    'Neutr',
-    'Plate',
-]
-
-SEED = 42
 np.random.seed(SEED)
 random.seed(SEED)
 
-def plot_class_distribution(plots_dir, y_train, y_test, y_val):
-    plt.plot()
-    train_classes, train_counts = np.unique(y_train, return_counts=True)
-    test_classes, test_counts = np.unique(y_test, return_counts=True)
-    val_classes, val_counts = np.unique(y_val, return_counts=True)
 
-    train_percentages = train_counts / len(y_train) * 100
-    test_percentages = test_counts / len(y_test) * 100
-    val_percentages = val_counts / len(y_val) * 100
+def run_knn(X_train, y_train, X_val, y_val, X_test, y_test, plots_dir):
+    """Run kNN classifier with hyperparameter tuning"""
+    print("\n" + "=" * 60)
+    print("PART 1: k-Nearest Neighbors")
+    print("=" * 60)
 
-    x = np.arange(len(train_classes))
-    width = 0.2
-    plt.bar(x - width * 1.1, train_percentages, width, label='Training', alpha=0.8)
-    plt.bar(x, test_percentages, width, label='Test', alpha=0.8)
-    plt.bar(x + width * 1.1, val_percentages, width, label='Validation', alpha=0.8)
-    
-
-    plt.xlabel('Class')
-    plt.ylabel('Percentage (%)')
-    plt.title('Class distribution')
-    plt.xticks(x, [f'{class_names[i]}' for i in train_classes], rotation=20)
-    plt.legend()
-    plt.grid(True, alpha=0.3, axis='y')
-
-    plt.tight_layout()
-    out = f"{plots_dir}/dataset_class_distribution.png"
-    plt.savefig(out, dpi=300, bbox_inches='tight')
-    plt.close()
-
-def plot_knn_validation_and_class_distribution(
-        plots_dir, k_values, acc_L2, acc_L1, best_params, y_train, y_test
-):
-    plt.figure(figsize=(18, 6))
-
-    # Left: L1/L2 validation accuracy vs k
-    plt.subplot(1, 3, 1)
-    plt.plot(k_values, acc_L2, 'bo-', label='L2 distance', linewidth=2, markersize=6)
-    plt.plot(k_values, acc_L1, 'rs-', label='L1 distance', linewidth=2, markersize=6)
-
-    best_idx = k_values.index(best_params['k'])
-    if best_params['metric'] == 'L2':
-        plt.plot(best_params['k'], acc_L2[best_idx], 'go', markersize=12,
-                 label=f"Best: k={best_params['k']}, L2")
-    else:
-        plt.plot(best_params['k'], acc_L1[best_idx], 'go', markersize=12,
-                 label=f"Best: k={best_params['k']}, L1")
-
-    plt.xlabel('k (number of neighbors)')
-    plt.ylabel('Validation accuracy (%)')
-    plt.title('kNN validation accuracy vs k')
-    plt.legend()
-    plt.grid(True, alpha=0.3)
-    plt.xticks(k_values)
-
-    # Middle: L2 - L1 accuracy difference
-    plt.subplot(1, 3, 2)
-    acc_diff = np.array(acc_L2) - np.array(acc_L1)
-    colors = ['blue' if diff > 0 else 'red' for diff in acc_diff]
-    bars = plt.bar(range(len(k_values)), acc_diff, alpha=0.7, color=colors)
-    plt.axhline(y=0, color='black', linestyle='-', alpha=0.5)
-    plt.xlabel('k Value')
-    plt.ylabel('L2 - L1 | Accuracy difference (%)')
-    plt.title('Distance comparison')
-    plt.xticks(range(len(k_values)), [str(k) for k in k_values], rotation=45)
-    plt.grid(True, alpha=0.3, axis='y')
-
-    for bar, diff in zip(bars, acc_diff):
-        if abs(diff) > 0.5: # Only label significant differences
-            plt.text(
-                bar.get_x() + bar.get_width() / 2,
-                bar.get_height() + (0.3 if diff > 0 else -0.5),
-                f'{diff:.1f}%',
-                ha='center',
-                va='bottom' if diff > 0 else 'top',
-                fontsize=8
-            )
-
-    # Right: class distribution
-    plt.subplot(1, 3, 3)
-    train_classes, train_counts = np.unique(y_train, return_counts=True)
-    test_classes, test_counts = np.unique(y_test, return_counts=True)
-
-    train_percentages = train_counts / len(y_train) * 100
-    test_percentages = test_counts / len(y_test) * 100
-
-    x = np.arange(len(train_classes))
-    width = 0.35
-    plt.bar(x - width / 2, train_percentages, width, label='Training', alpha=0.8)
-    plt.bar(x + width / 2, test_percentages, width, label='Test', alpha=0.8)
-
-    plt.xlabel('Class')
-    plt.ylabel('Percentage (%)')
-    plt.title('Class distribution')
-    plt.xticks(x, [f'C{i}' for i in train_classes])
-    plt.legend()
-    plt.grid(True, alpha=0.3, axis='y')
-
-    plt.tight_layout()
-    out = f"{plots_dir}/knn_validation_accuracy_and_class_distribution.png"
-    plt.savefig(out, dpi=300, bbox_inches='tight')
-    plt.close()
-    print(f"Saved plot: {out}")
-
-
-def plot_training_curves(hist, title, filename):
-    plt.figure(figsize=(7, 4))
-
-    if "loss_history" in hist and len(hist["loss_history"]) > 0:
-        loss_history = hist["loss_history"]
-        iterations = np.arange(len(loss_history))
-
-        # Plot raw batch loss (noisy)
-        plt.plot(iterations, loss_history, alpha=0.3, color='blue', linewidth=0.5, label="Batch loss (raw)")
-
-        # Plot smoothed loss using moving average
-        window_size = max(len(loss_history) // 50, 10)
-        smoothed_loss = np.convolve(loss_history, np.ones(window_size) / window_size, mode='valid')
-        smoothed_iterations = iterations[:len(smoothed_loss)]
-        plt.plot(smoothed_iterations, smoothed_loss, color='blue', linewidth=2, label="Loss (smoothed)")
-
-    if "train_acc_history" in hist and len(hist["train_acc_history"]) > 0:
-        x_train = np.linspace(0, len(hist["loss_history"]), num=len(hist["train_acc_history"]))
-        plt.plot(x_train, hist["train_acc_history"], color='orange', linewidth=2, label="Train acc (epoch)")
-
-    if "val_acc_history" in hist and len(hist["val_acc_history"]) > 0:
-        x_val = np.linspace(0, len(hist["loss_history"]), num=len(hist["val_acc_history"]))
-        plt.plot(x_val, hist["val_acc_history"], color='green', linewidth=2, label="Val acc (epoch)")
-
-    plt.xlabel("Iteration")
-    plt.ylabel("Loss / Accuracy")
-    plt.title(title)
-    plt.legend()
-    plt.grid(True, alpha=0.3)
-    plt.tight_layout()
-    plt.savefig(filename, dpi=300, bbox_inches='tight')
-    plt.close()
-    print(f"Saved plot: {filename}")
-
-
-# Use seaborn library instead?
-def plot_confusion_matrix(y_true, y_pred, title, filename):
-    cm = confusion_matrix(y_true, y_pred, normalize='true')
-    plt.figure(figsize=(10, 8))
-    plt.imshow(cm, cmap='Blues')
-    plt.title(title)
-    plt.colorbar()
-
-    tick_labels = [c[:8] for c in class_names]
-    plt.xticks(range(len(class_names)), tick_labels, rotation=45, ha='right')
-    plt.yticks(range(len(class_names)), tick_labels)
-
-    # Add text annotations
-    for i in range(len(class_names)):
-        for j in range(len(class_names)):
-            plt.text(j, i, str(round(cm[i, j], 2)), ha='center', va='center',
-                     color='white' if cm[i, j] > cm.max() / 2 else 'black')
-
-    plt.xlabel('Predicted Label')
-    plt.ylabel('True Label')
-    plt.tight_layout()
-    plt.savefig(filename, dpi=300, bbox_inches='tight')
-    plt.close()
-    print(f"Saved plot: {filename}")
-
-
-def main():
-    plots_dir = "../plots"
-    os.makedirs(plots_dir, exist_ok=True)
-
-    print("Loading data...")
-    X_train, y_train, X_val, y_val, X_test, y_test = load_data(size=28, subsample_train=5000)
-
-    print(f"Dataset: {X_train.shape[0]} train, {X_val.shape[0]} val, {X_test.shape[0]} test")
-    print(f"Features: {X_train.shape[1]}, Classes: {len(np.unique(y_train))}")
-    print()
-
-    plot_class_distribution(plots_dir, y_train, y_test, y_val)
-
-    # =========================
-    # PART 1: kNN
-    # =========================
     knn = KNearestNeighbor()
     knn.train(X_train, y_train)
-
-    k_values = [1, 3, 5, 7, 13, 21, 33, 45, 55, 67, 79, 91, 111, 131, 149, 167, 193, 201]
-    distance_metrics = ['L2', 'L1']
 
     print("Hyperparameter tuning results:")
     print("k\tL2 accuracy\tL1 accuracy")
@@ -219,9 +60,9 @@ def main():
     best_accuracy = 0.0
     best_params = {}
 
-    for k in k_values:
+    for k in KNN_K_VALUES:
         results = {}
-        for metric in distance_metrics:
+        for metric in KNN_DISTANCE_METRICS:
             preds = knn.predict(X_val, k=k, metric=metric)
             acc = np.mean(preds == y_val) * 100
             results[metric] = acc
@@ -233,7 +74,7 @@ def main():
         print(f"{k}\t{results['L2']:.1f}%\t\t{results['L1']:.1f}%")
 
     plot_knn_validation_and_class_distribution(
-        plots_dir, k_values, acc_L2, acc_L1, best_params, y_train, y_test
+        plots_dir, KNN_K_VALUES, acc_L2, acc_L1, best_params, y_train, y_test
     )
 
     print(f"\nBest: k={best_params['k']}, {best_params['metric']} ({best_accuracy:.1f}%)")
@@ -241,8 +82,7 @@ def main():
     test_accuracy = np.mean(final_predictions == y_test) * 100
     print(f"Final test accuracy: {test_accuracy:.1f}%")
 
-
-    plot_confusion_matrix(y_test, final_predictions, "KNN Confusion Matrix", f"{plots_dir}/confusion_matrix_knn.png")
+    plot_confusion_matrix(y_test, final_predictions, "kNN Confusion Matrix", f"{plots_dir}/02_knn_confusion_matrix.png")
 
     print("\nClass distribution:")
     for dataset_name, labels in [("Training", y_train), ("Test", y_test)]:
@@ -260,18 +100,20 @@ def main():
     print(f"Best k value: {best_params['k']}")
     print(f"Best distance metric: {best_params['metric']}")
 
-    # ===========================================
-    # PART 2: Linear Classifiers (SVM and Softmax)
-    # ===========================================
+    return {
+        'test_accuracy': test_accuracy,
+        'best_params': best_params,
+        'predictions': final_predictions
+    }
+
+
+def run_linear_classifiers(X_train, y_train, X_val, y_val, X_test, y_test, plots_dir, num_classes, dim):
+    """Run SVM and Softmax classifiers with hyperparameter tuning"""
     print("\n" + "=" * 60)
     print("PART 2: Linear Classifiers")
     print("=" * 60)
 
-    num_train, dim = X_train.shape
-    num_classes = int(np.max(y_train) + 1)
-
-    def run_grid(loss_type, Xtr, ytr, Xva, yva,
-                 lrs, regs, num_iters=200, batch_size=200, print_every=100):
+    def run_grid(loss_type, Xtr, ytr, Xva, yva, lrs, regs, num_iters, batch_size, print_every):
         best_val = -1.0
         best_tuple = None
         best_hist = None
@@ -307,13 +149,11 @@ def main():
         print(f"\nBest {loss_type.capitalize()}: lr={lr}, reg={reg} ({best_val * 100:.2f}%)\n")
         return clf, lr, reg, best_hist
 
-    lrs = [1e-4, 5e-4, 1e-3]
-    regs = [1e-4, 5e-4, 1e-3, 5e-3]
-
     # SVM
     svm_model, best_lr_svm, best_reg_svm, svm_hist = run_grid(
         "svm", X_train, y_train, X_val, y_val,
-        lrs, regs, num_iters=200, batch_size=200, print_every=100
+        LINEAR_LEARNING_RATES, LINEAR_REGULARIZATIONS,
+        LINEAR_NUM_ITERS, LINEAR_BATCH_SIZE, LINEAR_PRINT_EVERY
     )
     y_test_pred_svm = svm_model.predict(X_test)
     svm_test_acc = np.mean(y_test_pred_svm == y_test) * 100
@@ -322,21 +162,234 @@ def main():
     # Softmax
     softmax_model, best_lr_soft, best_reg_soft, softmax_hist = run_grid(
         "softmax", X_train, y_train, X_val, y_val,
-        lrs, regs, num_iters=200, batch_size=200, print_every=100
+        LINEAR_LEARNING_RATES, LINEAR_REGULARIZATIONS,
+        LINEAR_NUM_ITERS, LINEAR_BATCH_SIZE, LINEAR_PRINT_EVERY
     )
     y_test_pred_soft = softmax_model.predict(X_test)
     softmax_test_acc = np.mean(y_test_pred_soft == y_test) * 100
     print(f"Final Softmax test accuracy: {softmax_test_acc:.2f}%")
 
     # Training curves
-    plot_training_curves(svm_hist, "SVM Training (loss + epoch acc)", f"{plots_dir}/svm_training_curves.png")
+    plot_training_curves(svm_hist, "SVM Training (loss + epoch acc)", f"{plots_dir}/03_svm_training_curves.png")
     plot_training_curves(softmax_hist, "Softmax Training (loss + epoch acc)",
-                         f"{plots_dir}/softmax_training_curves.png")
+                         f"{plots_dir}/05_softmax_training_curves.png")
 
     # Confusion matrices
-    plot_confusion_matrix(y_test, y_test_pred_svm, "SVM Confusion Matrix", f"{plots_dir}/confusion_matrix_svm.png")
+    plot_confusion_matrix(y_test, y_test_pred_svm, "SVM Confusion Matrix", f"{plots_dir}/04_svm_confusion_matrix.png")
     plot_confusion_matrix(y_test, y_test_pred_soft, "Softmax Confusion Matrix",
-                          f"{plots_dir}/confusion_matrix_softmax.png")
+                          f"{plots_dir}/06_softmax_confusion_matrix.png")
+
+    return {
+        'svm': {
+            'model': svm_model,
+            'test_accuracy': svm_test_acc,
+            'best_lr': best_lr_svm,
+            'best_reg': best_reg_svm,
+            'history': svm_hist,
+            'predictions': y_test_pred_svm
+        },
+        'softmax': {
+            'model': softmax_model,
+            'test_accuracy': softmax_test_acc,
+            'best_lr': best_lr_soft,
+            'best_reg': best_reg_soft,
+            'history': softmax_hist,
+            'predictions': y_test_pred_soft
+        }
+    }
+
+
+def run_neural_network(X_train_nn, y_train_nn, X_val_nn, y_val_nn, X_test_nn, y_test_nn, plots_dir, num_classes):
+    """Run neural network with hyperparameter tuning"""
+    print("\n" + "=" * 60)
+    print("PART 3: Neural Networks")
+    print("=" * 60)
+
+    print("\nLoading data for Neural Network...")
+    print(f"NN data shapes: {X_train_nn.shape}, {X_val_nn.shape}, {X_test_nn.shape}")
+
+    def run_nn_grid(Xtr, ytr, Xva, yva, hidden_sizes, lrs, regs, optimizers,
+                    num_iters, batch_size, print_every):
+        """
+        Hyperparameter search for neural network.
+        Similar to run_grid for linear classifiers but with more hyperparameters.
+        """
+        best_val = -1.0
+        best_tuple = None
+        best_hist = None
+        all_results = []
+
+        print("\nOptimizing Neural Network:")
+        print("Hidden\tLR\tReg\tOptimizer\tVal Accuracy")
+        print("-" * 60)
+
+        # Use input dimension from NN data (no bias column)
+        input_dim = Xtr.shape[1]
+
+        for hidden_size in hidden_sizes:
+            for lr in lrs:
+                for reg in regs:
+                    for opt in optimizers:
+                        layers = [input_dim, hidden_size, num_classes]
+                        nn = FullyConnectedNN(
+                            layers=layers,
+                            reg_strength=reg,
+                            loss='softmax',
+                            seed=SEED
+                        )
+
+                        hist = nn.train(
+                            Xtr, ytr,
+                            X_val=Xva, y_val=yva,
+                            learning_rate=lr, reg=reg,
+                            num_iters=num_iters, batch_size=batch_size,
+                            optimizer=opt, print_every=print_every
+                        )
+
+                        if hist["val_acc_history"]:
+                            val_acc = hist["val_acc_history"][-1]
+                        else:
+                            val_acc = np.mean(nn.predict(Xva) == yva)
+
+                        print(f"{hidden_size}\t{lr:<7g}\t{reg:<7g}\t{opt}\t\t{val_acc * 100:.2f}%")
+
+                        # Track the results
+                        all_results.append({
+                            'hidden': hidden_size,
+                            'lr': lr,
+                            'reg': reg,
+                            'opt': opt,
+                            'val_acc': val_acc
+                        })
+
+                        if val_acc > best_val:
+                            best_val = val_acc
+                            best_tuple = (nn, hidden_size, lr, reg, opt)
+                            best_hist = hist
+
+        nn, h_size, lr, reg, opt = best_tuple
+        print(f"\nBest NN: hidden={h_size}, lr={lr}, reg={reg}, opt={opt} ({best_val * 100:.2f}%)\n")
+        return nn, h_size, lr, reg, opt, best_hist, all_results
+
+    # Grid search
+    nn_model, best_hidden, best_lr_nn, best_reg_nn, best_opt, nn_hist, nn_results = run_nn_grid(
+        X_train_nn, y_train_nn, X_val_nn, y_val_nn,
+        NN_HIDDEN_SIZES, NN_LEARNING_RATES, NN_REGULARIZATIONS, NN_OPTIMIZERS,
+        NN_NUM_ITERS, NN_BATCH_SIZE, NN_PRINT_EVERY
+    )
+
+    y_test_pred_nn = nn_model.predict(X_test_nn)
+    nn_test_acc = np.mean(y_test_pred_nn == y_test_nn) * 100
+    print(f"Final Neural Network test accuracy: {nn_test_acc:.2f}%")
+
+    plot_nn_hyperparameter_results(nn_results, plots_dir)
+
+    plot_confusion_matrix(y_test_nn, y_test_pred_nn, "Neural Network Confusion Matrix",
+                          f"{plots_dir}/10_nn_confusion_matrix.png")
+
+    visualize_nn_weights(nn_model, f"{plots_dir}/11_nn_learned_weights.png")
+
+    print("\nPer-class accuracy on test set:")
+    for i, class_name in enumerate(CLASS_NAMES):
+        class_mask = y_test_nn == i
+        if np.sum(class_mask) > 0:
+            class_acc = np.mean(y_test_pred_nn[class_mask] == y_test_nn[class_mask]) * 100
+            print(f"  {class_name:25s}: {class_acc:5.2f}% ({np.sum(class_mask):4d} samples)")
+
+    total_params = sum(p.size for p in nn_model.params.values())
+    print(f"\nNeural Network statistics:")
+    print(f"  Architecture: {nn_model.layers}")
+    print(f"  Total parameters: {total_params:,}")
+    print(f"  Best hidden layer size: {best_hidden}")
+    print(f"  Best learning rate: {best_lr_nn}")
+    print(f"  Best regularization: {best_reg_nn}")
+    print(f"  Best optimizer: {best_opt}")
+    if nn_hist['val_acc_history']:
+        best_epoch = np.argmax(nn_hist['val_acc_history'])
+        print(f"  Best validation accuracy at epoch: {best_epoch}")
+        print(f"  Final train accuracy: {nn_hist['train_acc_history'][-1] * 100:.2f}%")
+        print(f"  Final validation accuracy: {nn_hist['val_acc_history'][-1] * 100:.2f}%")
+        print(f"  Train-Val gap: {(nn_hist['train_acc_history'][-1] - nn_hist['val_acc_history'][-1]) * 100:.2f}%")
+
+    return {
+        'model': nn_model,
+        'test_accuracy': nn_test_acc,
+        'best_params': {
+            'hidden_size': best_hidden,
+            'learning_rate': best_lr_nn,
+            'regularization': best_reg_nn,
+            'optimizer': best_opt
+        },
+        'predictions': y_test_pred_nn,
+        'history': nn_hist,
+        'all_results': nn_results
+    }
+
+
+def main():
+    plots_dir = PLOTS_DIR
+    os.makedirs(plots_dir, exist_ok=True)
+
+    print("Loading data...")
+    X_train, y_train, X_val, y_val, X_test, y_test = load_data(size=DATA_SIZE, subsample_train=SUBSAMPLE_TRAIN)
+
+    print(f"Dataset: {X_train.shape[0]} train, {X_val.shape[0]} val, {X_test.shape[0]} test")
+    print(f"Features: {X_train.shape[1]}, Classes: {len(np.unique(y_train))}")
+    print()
+
+    num_train, dim = X_train.shape
+    num_classes = int(np.max(y_train) + 1)
+
+    results = {}
+
+    # Run kNN
+    if config['run_knn']:
+        results['knn'] = run_knn(X_train, y_train, X_val, y_val, X_test, y_test, plots_dir)
+
+    # Run Linear Classifiers
+    if config['run_linear']:
+        linear_results = run_linear_classifiers(
+            X_train, y_train, X_val, y_val, X_test, y_test,
+            plots_dir, num_classes, dim
+        )
+        results['svm'] = linear_results['svm']
+        results['softmax'] = linear_results['softmax']
+
+    # Run Neural Network
+    if config['run_nn']:
+        X_train_nn, y_train_nn, X_val_nn, y_val_nn, X_test_nn, y_test_nn = load_data_nn(
+            size=DATA_SIZE, subsample_train=SUBSAMPLE_TRAIN, subsample_val=SUBSAMPLE_VAL, seed=SEED
+        )
+        results['nn'] = run_neural_network(
+            X_train_nn, y_train_nn, X_val_nn, y_val_nn, X_test_nn, y_test_nn,
+            plots_dir, num_classes
+        )
+
+    # Comparison (only if at least 2 models were run)
+    if sum(config.values()) >= 2:
+        print("\n" + "=" * 60)
+        print("COMPARISON OF ALL MODELS")
+        print("=" * 60)
+
+        if 'knn' in results:
+            print(f"kNN:            {results['knn']['test_accuracy']:.2f}%")
+        if 'svm' in results:
+            print(f"SVM:            {results['svm']['test_accuracy']:.2f}%")
+        if 'softmax' in results:
+            print(f"Softmax:        {results['softmax']['test_accuracy']:.2f}%")
+        if 'nn' in results:
+            print(f"Neural Network: {results['nn']['test_accuracy']:.2f}%")
+        print("=" * 60)
+
+        # Only plot comparison if all models were run
+        if all(config.values()):
+            plot_model_comparison(
+                results['knn']['test_accuracy'],
+                results['svm']['test_accuracy'],
+                results['softmax']['test_accuracy'],
+                results['nn']['test_accuracy'],
+                plots_dir
+            )
 
     print("\nDone!")
 
