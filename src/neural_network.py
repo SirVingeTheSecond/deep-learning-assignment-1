@@ -207,10 +207,10 @@ class FullyConnectedNN:
         - Can oscillate and converge slowly
 
         Momentum:
-        - Accumulates velocity (exponential moving average of gradients)
-        - Helps accelerate in relevant directions and dampen oscillations
-        - Formula: v = beta * v + (1-beta) * gradient
-        -          W = W - learning_rate * v
+        - Momentum:
+        - follows these formulas:
+        - update rule: w_t+1= w_t - learning_rate * m_t
+        - momentum term: m_t = beta * m_t-1 + (1 - beta) * gradient
 
         Adam (Adaptive Moment Estimation):
         - Maintains both first moment (mean) and second moment (variance) of gradients
@@ -220,13 +220,17 @@ class FullyConnectedNN:
         """
         for i in range(1, len(self.layers)):
             if optimizer == 'sgd':
+                # Standard SGD update
                 self.params['W' + str(i)] -= learning_rate * grads['W' + str(i)]
                 self.params['b' + str(i)] -= learning_rate * grads['b' + str(i)]
             elif optimizer == 'momentum':
-                v['dW' + str(i)] = beta1 * v['dW' + str(i)] + (1 - beta1) * grads['W' + str(i)]
-                v['db' + str(i)] = beta1 * v['db' + str(i)] + (1 - beta1) * grads['b' + str(i)]
-                self.params['W' + str(i)] -= learning_rate * v['dW' + str(i)]
-                self.params['b' + str(i)] -= learning_rate * v['db' + str(i)]
+                # Momentum 
+                v['m_W' + str(i)] = beta1 * v['m_W' + str(i)] + (1 - beta1) * grads['W' + str(i)]
+                v['m_b' + str(i)] = beta1 * v['m_b' + str(i)] + (1 - beta1) * grads['b' + str(i)]
+
+                self.params['W' + str(i)] -= learning_rate * v['m_W' + str(i)]
+                self.params['b' + str(i)] -= learning_rate * v['m_b' + str(i)]
+
             elif optimizer == 'adam':
                 # a small constant to prevent division by zero
                 eps = 1e-8
@@ -263,17 +267,22 @@ class FullyConnectedNN:
         val_acc_history = []
 
         v = None
-        if optimizer in ['momentum', 'adam']:
+        if optimizer == 'momentum':
             v = {}
             for i in range(1, len(self.layers)):
-                v['dW' + str(i)] = np.zeros_like(self.params['W' + str(i)])
-                v['db' + str(i)] = np.zeros_like(self.params['b' + str(i)])
-                if optimizer == 'adam':
-                    v['mW' + str(i)] = np.zeros_like(self.params['W' + str(i)])
-                    v['vW' + str(i)] = np.zeros_like(self.params['W' + str(i)])
-                    # also track first and second moments for biases (adam)
-                    v['mb' + str(i)] = np.zeros_like(self.params['b' + str(i)])
-                    v['vb' + str(i)] = np.zeros_like(self.params['b' + str(i)])
+                # moving average of gradients (m_t), NOT velocity
+                v['mW' + str(i)] = np.zeros_like(self.params['W' + str(i)])
+                v['mb' + str(i)] = np.zeros_like(self.params['b' + str(i)])
+
+        elif optimizer == 'adam':
+            v = {'t': 0}  # timestep for bias correction
+            for i in range(1, len(self.layers)):
+                # first moment (m) and second moment (v) for W and b
+                v['mW' + str(i)] = np.zeros_like(self.params['W' + str(i)])
+                v['vW' + str(i)] = np.zeros_like(self.params['W' + str(i)])
+                v['mb' + str(i)] = np.zeros_like(self.params['b' + str(i)])
+                v['vb' + str(i)] = np.zeros_like(self.params['b' + str(i)])
+
 
         for it in range(num_iters):
             # Sample minibatch
