@@ -305,7 +305,26 @@ def main():
     plot_confusion_matrix(y_test, y_test_pred_soft, "Softmax Confusion Matrix",
                           f"{plots_dir}/confusion_matrix_softmax.png")
 
+    # ===========================================
+    # PART 3: Neural Network
+    # ===========================================
+    print("\n" + "=" * 60)
+    print("PART 3: Neural Networks")
+    print("\n" + "=" * 60)
+
+    X_train_nn, y_train_nn, X_val_nn, y_val_nn, X_test_nn, y_test_nn = load_data_nn(
+        size=28, subsample_train=1000, subsample_val=1000, seed=SEED
+    )
+
+    def nn_grid(Xtr, ytr, Xva, yva, ):
+
+
+
+
+
     print("\nDone!")
+
+
 
 
 if __name__ == "__main__":
