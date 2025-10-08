@@ -271,8 +271,8 @@ class FullyConnectedNN:
             v = {}
             for i in range(1, len(self.layers)):
                 # moving average of gradients (m_t), NOT velocity
-                v['mW' + str(i)] = np.zeros_like(self.params['W' + str(i)])
-                v['mb' + str(i)] = np.zeros_like(self.params['b' + str(i)])
+                v['m_W' + str(i)] = np.zeros_like(self.params['W' + str(i)])
+                v['m_b' + str(i)] = np.zeros_like(self.params['b' + str(i)])
 
         elif optimizer == 'adam':
             v = {'t': 0}  # timestep for bias correction
@@ -282,7 +282,6 @@ class FullyConnectedNN:
                 v['vW' + str(i)] = np.zeros_like(self.params['W' + str(i)])
                 v['mb' + str(i)] = np.zeros_like(self.params['b' + str(i)])
                 v['vb' + str(i)] = np.zeros_like(self.params['b' + str(i)])
-
 
         for it in range(num_iters):
             # Sample minibatch
