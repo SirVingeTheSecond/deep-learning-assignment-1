@@ -76,7 +76,7 @@ def run_knn(X_train, y_train, X_val, y_val, X_test, y_test, plots_dir):
     test_accuracy = np.mean(final_predictions == y_test) * 100
     print(f"Final test accuracy: {test_accuracy:.1f}%")
 
-    plot_confusion_matrix(y_test, final_predictions, "KNN Confusion Matrix", f"{plots_dir}/confusion_matrix_knn.png")
+    plot_confusion_matrix(y_test, final_predictions, "kNN Confusion Matrix", f"{plots_dir}/02_knn_confusion_matrix.png")
 
     print("\nClass distribution:")
     for dataset_name, labels in [("Training", y_train), ("Test", y_test)]:
@@ -166,14 +166,14 @@ def run_linear_classifiers(X_train, y_train, X_val, y_val, X_test, y_test, plots
     print(f"Final Softmax test accuracy: {softmax_test_acc:.2f}%")
 
     # Training curves
-    plot_training_curves(svm_hist, "SVM Training (loss + epoch acc)", f"{plots_dir}/svm_training_curves.png")
+    plot_training_curves(svm_hist, "SVM Training (loss + epoch acc)", f"{plots_dir}/03_svm_training_curves.png")
     plot_training_curves(softmax_hist, "Softmax Training (loss + epoch acc)",
-                         f"{plots_dir}/softmax_training_curves.png")
+                         f"{plots_dir}/05_softmax_training_curves.png")
 
     # Confusion matrices
-    plot_confusion_matrix(y_test, y_test_pred_svm, "SVM Confusion Matrix", f"{plots_dir}/confusion_matrix_svm.png")
+    plot_confusion_matrix(y_test, y_test_pred_svm, "SVM Confusion Matrix", f"{plots_dir}/04_svm_confusion_matrix.png")
     plot_confusion_matrix(y_test, y_test_pred_soft, "Softmax Confusion Matrix",
-                          f"{plots_dir}/confusion_matrix_softmax.png")
+                          f"{plots_dir}/06_softmax_confusion_matrix.png")
 
     return {
         'svm': {
@@ -287,17 +287,14 @@ def run_neural_network(X_train_nn, y_train_nn, X_val_nn, y_val_nn, X_test_nn, y_
     plot_nn_hyperparameter_results(nn_results, plots_dir)
 
     # Training curves for neural network
-    plot_training_curves(nn_hist, "Neural Network Training (loss + epoch acc)", f"{plots_dir}/nn_training_curves.png")
-
-    plot_nn_training_loss(nn_hist, f"{plots_dir}/nn_training_loss.png")
-    plot_nn_accuracy_per_epoch(nn_hist, f"{plots_dir}/nn_accuracy.png")
+    #plot_training_curves(nn_hist, "Neural Network Training (loss + epoch acc)", f"{plots_dir}/nn_training_curves.png")
 
     # Confusion matrix for neural network
     plot_confusion_matrix(y_test_nn, y_test_pred_nn, "Neural Network Confusion Matrix",
-                          f"{plots_dir}/confusion_matrix_nn.png")
+                          f"{plots_dir}/10_nn_confusion_matrix.png")
 
     # Visualize learned weights
-    visualize_nn_weights(nn_model, f"{plots_dir}/nn_learned_weights.png")
+    visualize_nn_weights(nn_model, f"{plots_dir}/11_nn_learned_weights.png")
 
     # Per class accuracy analysis
     print("\nPer-class accuracy on test set:")

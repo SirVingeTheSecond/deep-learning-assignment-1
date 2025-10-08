@@ -360,7 +360,7 @@ class FullyConnectedNN:
 #         plt.ylabel('Loss')
 #         plt.grid(True)
 #         plt.tight_layout()
-#         plt.savefig(os.path.join(plots_dir, 'nn_training_loss.png'))
+#         plt.savefig(os.path.join(plots_dir, '08_nn_training_loss.png'))
 #         plt.close()
 #
 #         if len(history['train_acc_history']) > 0:
@@ -374,7 +374,7 @@ class FullyConnectedNN:
 #             plt.legend()
 #             plt.grid(True)
 #             plt.tight_layout()
-#             plt.savefig(os.path.join(plots_dir, 'nn_accuracy.png'))
+#             plt.savefig(os.path.join(plots_dir, '09_nn_training_accuracy.png'))
 #             plt.close()
 #     except Exception:
 #         print('matplotlib not available; skipping plots')

@@ -84,7 +84,7 @@ def plot_knn_validation_and_class_distribution(
     plt.grid(True, alpha=0.3, axis='y')
 
     plt.tight_layout()
-    out = f"{plots_dir}/knn_validation_accuracy_and_class_distribution.png"
+    out = f"{plots_dir}/01_knn_validation_accuracy.png"
     plt.savefig(out, dpi=300, bbox_inches='tight')
     plt.close()
     print(f"Saved plot: {out}")
@@ -270,7 +270,7 @@ def plot_nn_hyperparameter_results(results_list, plots_dir):
     ax6.grid(True, alpha=0.3, axis='y')
 
     plt.tight_layout()
-    out = f"{plots_dir}/nn_hyperparameter_tuning.png"
+    out = f"{plots_dir}/07_nn_hyperparameter_tuning.png"
     plt.savefig(out, dpi=300, bbox_inches='tight')
     plt.close()
     print(f"Saved plot: {out}")
@@ -305,7 +305,7 @@ def plot_model_comparison(knn_acc, svm_acc, softmax_acc, nn_acc, plots_dir):
     bars[best_idx].set_linewidth(3)
 
     plt.tight_layout()
-    out = f"{plots_dir}/model_comparison.png"
+    out = f"{plots_dir}/12_model_comparison.png"
     plt.savefig(out, dpi=300, bbox_inches='tight')
     plt.close()
     print(f"Saved plot: {out}")
