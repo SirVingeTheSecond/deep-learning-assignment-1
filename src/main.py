@@ -164,7 +164,7 @@ def plot_training_curves(hist, title, filename):
 
 # Use seaborn library instead?
 def plot_confusion_matrix(y_true, y_pred, title, filename):
-    cm = confusion_matrix(y_true, y_pred)
+    cm = confusion_matrix(y_true, y_pred, normalize='true')
     plt.figure(figsize=(10, 8))
     plt.imshow(cm, cmap='Blues')
     plt.title(title)
@@ -177,7 +177,7 @@ def plot_confusion_matrix(y_true, y_pred, title, filename):
     # Add text annotations
     for i in range(len(class_names)):
         for j in range(len(class_names)):
-            plt.text(j, i, str(cm[i, j]), ha='center', va='center',
+            plt.text(j, i, str(round(cm[i, j], 2)), ha='center', va='center',
                      color='white' if cm[i, j] > cm.max() / 2 else 'black')
 
     plt.xlabel('Predicted Label')
@@ -240,6 +240,9 @@ def main():
     final_predictions = knn.predict(X_test, k=best_params['k'], metric=best_params['metric'])
     test_accuracy = np.mean(final_predictions == y_test) * 100
     print(f"Final test accuracy: {test_accuracy:.1f}%")
+
+
+    plot_confusion_matrix(y_test, final_predictions, "KNN Confusion Matrix", f"{plots_dir}/confusion_matrix_knn.png")
 
     print("\nClass distribution:")
     for dataset_name, labels in [("Training", y_train), ("Test", y_test)]:
