@@ -1,5 +1,8 @@
 import numpy as np
+import os
 from medmnist import BloodMNIST
+
+# plotting is only used by the demo; import inside main if not available
 
 def load_data_nn(size=28, subsample_train=1000, subsample_val=1000, seed=0):
     np.random.seed(seed)
@@ -35,13 +38,19 @@ def load_data_nn(size=28, subsample_train=1000, subsample_val=1000, seed=0):
     X_val = X_val.reshape(X_val.shape[0], -1)
     X_test = X_test.reshape(X_test.shape[0], -1)
 
+    # Ensure images are float32
+    X_train = X_train.astype(np.float32)
+    X_val = X_val.astype(np.float32)
+    X_test = X_test.astype(np.float32)
+
     # Preprocessing: subtract the mean image
     # first: compute the image mean based on the training data
-    mean_image = np.mean(X_train, axis=0)
+    mean_image = np.mean(X_train, axis=0).astype(np.float32)
 
     # second: subtract the mean image from train and test data
-    X_train = X_train.astype(np.float32) - mean_image
-    X_val = X_val.astype(np.float32) - mean_image
+    X_train = X_train - mean_image
+    X_val = X_val - mean_image
+    X_test = X_test - mean_image
 
     X_train /= 255.0
     X_val /= 255.0
@@ -148,7 +157,7 @@ class FullyConnectedNN:
 
         return grads
 
-    def update_params(self, grads, learning_rate, v=None, beta1=0.9, beta2=0.999, t=1, optimizer='sgd'):
+    def update_params(self, grads, learning_rate, v=None, beta1=0.9, beta2=0.999, t=1, optimizer='adam'):
         """
         Updates parameters with chosen optimization method.
         If optimizer is 'momentum' or 'adam', it requires v for velocity and also t for time step in adam.
@@ -163,14 +172,29 @@ class FullyConnectedNN:
                 self.params['W' + str(i)] -= learning_rate * v['dW' + str(i)]
                 self.params['b' + str(i)] -= learning_rate * v['db' + str(i)]
             elif optimizer == 'adam':
+                # a small constant to prevent division by zero
+                eps = 1e-8
+                # Update first and second moment estimates for weights
                 v['mW' + str(i)] = beta1 * v['mW' + str(i)] + (1 - beta1) * grads['W' + str(i)]
-                v['vW' + str(i)] = beta2 * v['vW' + str(i)] + (1 - beta2) * np.square(grads['W' + str(i)])
-                mW_hat = v['mW' + str(i)] / (1 - beta1**t)
-                vW_hat = v['vW' + str(i)] / (1 - beta2**t)
-                self.params['W' + str(i)] -= learning_rate * mW_hat / (np.sqrt(vW_hat) + 1e-8)
+                v['vW' + str(i)] = beta2 * v['vW' + str(i)] + (1 - beta2) * (grads['W' + str(i)] ** 2)
+
+                # Update first and second moment estimates for biases
+                v['mb' + str(i)] = beta1 * v['mb' + str(i)] + (1 - beta1) * grads['b' + str(i)]
+                v['vb' + str(i)] = beta2 * v['vb' + str(i)] + (1 - beta2) * (grads['b' + str(i)] ** 2)
+
+                # Bias-corrected moment estimates
+                mW_hat = v['mW' + str(i)] / (1 - beta1 ** t)
+                vW_hat = v['vW' + str(i)] / (1 - beta2 ** t)
+
+                mb_hat = v['mb' + str(i)] / (1 - beta1 ** t)
+                vb_hat = v['vb' + str(i)] / (1 - beta2 ** t)
+
+                # Parameter updates
+                self.params['W' + str(i)] -= learning_rate * mW_hat / (np.sqrt(vW_hat) + eps)
+                self.params['b' + str(i)] -= learning_rate * mb_hat / (np.sqrt(vb_hat) + eps)
 
     def train(self, X, y, X_val=None, y_val=None, learning_rate=0.01, reg=0.01,
-              num_iters=200, batch_size=64, optimizer='sgd', print_every=100):
+              num_iters=200, batch_size=64, optimizer='adam', print_every=100):
         """
         Trains the model using the chosen optimizer.
         """
@@ -191,6 +215,9 @@ class FullyConnectedNN:
                 if optimizer == 'adam':
                     v['mW' + str(i)] = np.zeros_like(self.params['W' + str(i)])
                     v['vW' + str(i)] = np.zeros_like(self.params['W' + str(i)])
+                    # also track first and second moments for biases (adam)
+                    v['mb' + str(i)] = np.zeros_like(self.params['b' + str(i)])
+                    v['vb' + str(i)] = np.zeros_like(self.params['b' + str(i)])
 
         for it in range(num_iters):
             # Sample minibatch
@@ -202,12 +229,26 @@ class FullyConnectedNN:
             loss = self.compute_loss(A_last, y_batch)
             grads = self.backward(cache, y_batch)
 
-            self.update_params(grads, learning_rate, v=v, optimizer=optimizer)
+            # pass current time-step to optimizer (used by Adam for bias-correction)
+            self.update_params(grads, learning_rate, v=v, optimizer=optimizer, t=it+1)
 
             loss_history.append(loss)
 
+            # show results per epoch
+            if (it + 1) % iterations_per_epoch == 0:
+                train_acc = np.mean(self.predict(X) == y)
+                train_acc_history.append(train_acc)
+                if X_val is not None and y_val is not None:
+                    val_acc = np.mean(self.predict(X_val) == y_val)
+                    val_acc_history.append(val_acc)
+
             if (it + 1) % print_every == 0:
-                print(str(it + 1) + "/" + str(num_iters) + " " + str(loss))
+                msg = f"{it+1}/{num_iters} loss={loss:.4f}"
+                if len(train_acc_history):
+                    msg += f" train_acc={train_acc_history[-1]:.4f}"
+                if len(val_acc_history):
+                    msg += f" val_acc={val_acc_history[-1]:.4f}"
+                print(msg)
 
         return {
             'loss_history': loss_history,
@@ -223,19 +264,56 @@ class FullyConnectedNN:
             return np.argmax(A_last, axis=1)
 
 
-nn = FullyConnectedNN(layers=[X_train.shape[1], 500, 8], loss='softmax')
+if __name__ == '__main__':
+    # sumsamlpe demo
+    X_train, y_train, X_val, y_val, X_test, y_test = load_data_nn(subsample_train=2000, subsample_val=500)
 
-# Train the neural network on the subsampled training data for 200 epochs
-# using stochastic gradient decent
-nn.fit(X_train, y_train,learning_rate=0.01, epochs=200,optimizer='sgd')
+    nn = FullyConnectedNN(layers=[X_train.shape[1], 500, 8], loss='softmax')
 
-    #classify training data and val data using the trained model
-preds = nn.predict(X_train)
+    # train the network
+    history = nn.train(X_train, y_train, X_val=X_val, y_val=y_val,
+                       learning_rate=1e-3, reg=1e-3, num_iters=2000,
+                       batch_size=128, optimizer='adam', print_every=200)
 
-print(f'Training accuracy={np.mean(preds==y_train)}')
+    # final accuracies
+    train_acc = np.mean(nn.predict(X_train) == y_train)
+    val_acc = np.mean(nn.predict(X_val) == y_val)
+    print(f'Final Training accuracy={train_acc:.4f}')
+    print(f'Final Validation accuracy={val_acc:.4f}')
+
+    # create plots folder
+    plots_dir = os.path.join(os.path.dirname(__file__), '..', 'plots')
+    os.makedirs(plots_dir, exist_ok=True)
+
+    # Plottin with matplotlib 
+    try:
+        import matplotlib.pyplot as plt
+
+        plt.figure(figsize=(8, 4))
+        plt.plot(history['loss_history'])
+        plt.title('Training loss')
+        plt.xlabel('Iteration')
+        plt.ylabel('Loss')
+        plt.grid(True)
+        plt.tight_layout()
+        plt.savefig(os.path.join(plots_dir, 'nn_training_loss.png'))
+        plt.close()
+
+        if len(history['train_acc_history']) > 0:
+            plt.figure(figsize=(8, 4))
+            plt.plot(history['train_acc_history'], label='train')
+            if len(history['val_acc_history']):
+                plt.plot(history['val_acc_history'], label='val')
+            plt.title('Accuracy per epoch')
+            plt.xlabel('Epoch')
+            plt.ylabel('Accuracy')
+            plt.legend()
+            plt.grid(True)
+            plt.tight_layout()
+            plt.savefig(os.path.join(plots_dir, 'nn_accuracy.png'))
+            plt.close()
+    except Exception:
+        print('matplotlib not available; skipping plots')
 
 
-val_preds = nn.predict(X_val)
-
-print(f'Validation accuracy={np.mean(val_preds==y_val)}')
 
