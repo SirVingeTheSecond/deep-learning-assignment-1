@@ -38,7 +38,8 @@ class LinearClassifier:
                 #Apply combined loss
                 self.W -= gradient * learning_rate
                 avg_loss += loss
-                loss_history.append(loss)
+            
+            loss_history.append(avg_loss / num_batches)
 
             if (it + 1) % print_every == 0:
                 print(str(it + 1) + "/" + str(num_iters) + " " + str(avg_loss / num_batches))
