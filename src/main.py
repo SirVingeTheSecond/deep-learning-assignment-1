@@ -32,6 +32,7 @@ from neural_network import FullyConnectedNN, load_data_nn
 from plot import (
     plot_class_distribution,
     plot_knn_validation_and_class_distribution,
+    plot_linear_classifier_hyperparameters,
     plot_training_curves,
     plot_confusion_matrix,
     plot_nn_hyperparameter_results,
@@ -123,6 +124,8 @@ def run_linear_classifiers(X_train, y_train, X_val, y_val, X_test, y_test, plots
         print("lr\treg\tVal Accuracy")
         print("-" * 35)
 
+        results = []
+
         for lr in lrs:
             for reg in regs:
                 clf = LinearClassifier(input_dim=dim, num_classes=num_classes, loss_type=loss_type)
@@ -139,6 +142,7 @@ def run_linear_classifiers(X_train, y_train, X_val, y_val, X_test, y_test, plots
                 else:
                     val_acc = np.mean(clf.predict(Xva) == yva)
 
+                results.append([lr, reg, val_acc])
                 print(f"{lr:<7g}\t{reg:<7g}\t{val_acc * 100:.2f}%")
 
                 if val_acc > best_val:
@@ -146,8 +150,11 @@ def run_linear_classifiers(X_train, y_train, X_val, y_val, X_test, y_test, plots
                     best_tuple = (clf, lr, reg)
                     best_hist = hist
 
+
         clf, lr, reg = best_tuple
         print(f"\nBest {loss_type.capitalize()}: lr={lr}, reg={reg} ({best_val * 100:.2f}%)\n")
+        print(results)
+        plot_linear_classifier_hyperparameters(plots_dir, results, loss_type)
         return clf, lr, reg, best_hist
 
     # SVM

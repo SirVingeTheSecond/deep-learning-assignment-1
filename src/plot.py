@@ -2,8 +2,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix
 from math import ceil, sqrt
+from scipy.interpolate import griddata
 
-from config import CLASS_NAMES
+from config import CLASS_NAMES, LINEAR_LEARNING_RATES, LINEAR_REGULARIZATIONS
 
 def plot_class_distribution(plots_dir, y_train, y_test, y_val):
     plt.plot()
@@ -108,6 +109,57 @@ def plot_knn_validation_and_class_distribution(
     plt.close()
     print(f"Saved plot: {out}")
 
+
+def plot_linear_classifier_hyperparameters(plots_dir, results, loss_type):
+    # Extract columns
+    x = np.array([r[0] for r in results])   # e.g. 0.0001, 0.0005, 0.001
+    y = np.array([r[1] for r in results])   # e.g. 1, 2
+    z = np.array([r[2] for r in results])   # your score
+
+    # Interpolate in log-space for X
+    log_x = np.log10(x)
+    log_y = np.log10(y)
+    xi = np.linspace(log_x.min(), log_x.max(), 200)
+    yi = np.linspace(log_y.min(), log_y.max(), 200)
+    Xi, Yi = np.meshgrid(xi, yi)
+
+    # Interpolate using linear method
+    Zi = griddata((log_x, log_y), z, (Xi, Yi), method='linear')
+
+    fig, ax = plt.subplots()
+
+    # Show gradient background
+    im = ax.imshow(
+        Zi,
+        extent=(log_x.min(), log_x.max(), log_y.min(), log_y.max()),
+        origin='lower',
+        cmap='viridis',  # or 'plasma', 'gray', etc.
+        aspect='auto'
+    )
+
+    # Overlay original scatter points
+    sc = ax.scatter(log_x, log_y, c=z, cmap='viridis', edgecolor='black', s=100)
+
+    # Colorbar
+    plt.colorbar(im, ax=ax, label='Score')
+
+    # Log-scale ticks: convert back to actual learning rate values
+    x_ticks = np.array(LINEAR_LEARNING_RATES)
+    ax.set_xticks(np.log10(x_ticks))
+    ax.set_xticklabels([str(v) for v in x_ticks])
+
+    y_ticks = np.array(LINEAR_REGULARIZATIONS) 
+    ax.set_yticks(np.log10(y_ticks))
+    ax.set_yticklabels([str(v) for v in y_ticks])
+
+    plt.xlabel("Learning Rate")
+    plt.ylabel("Regularization Strength")
+    plt.title(f"Hyperparameter Surface ({loss_type})")
+
+    out = f"{plots_dir}/08_linear_hyperparam_results_{loss_type}.png"
+    plt.savefig(out, dpi=300, bbox_inches='tight')
+    plt.show()
+    plt.close()
 
 def plot_training_curves(hist, title, filename):
     plt.figure(figsize=(7, 4))
