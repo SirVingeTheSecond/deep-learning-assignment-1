@@ -30,6 +30,7 @@ from k_nearest_neighbor import KNearestNeighbor
 from linear_classifier import LinearClassifier
 from neural_network import FullyConnectedNN, load_data_nn
 from plot import (
+    plot_class_distribution,
     plot_knn_validation_and_class_distribution,
     plot_training_curves,
     plot_confusion_matrix,
@@ -332,6 +333,8 @@ def main():
 
     print("Loading data...")
     X_train, y_train, X_val, y_val, X_test, y_test = load_data(size=DATA_SIZE, subsample_train=SUBSAMPLE_TRAIN)
+
+    plot_class_distribution(PLOTS_DIR, y_train, y_test, y_val)
 
     print(f"Dataset: {X_train.shape[0]} train, {X_val.shape[0]} val, {X_test.shape[0]} test")
     print(f"Features: {X_train.shape[1]}, Classes: {len(np.unique(y_train))}")
