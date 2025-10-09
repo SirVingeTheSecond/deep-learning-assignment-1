@@ -41,7 +41,7 @@ def svm_loss(W,X,y,reg=0.0):
   margins[np.arange(N),y] = 0
 
   loss = np.sum(margins) / N #Average loss
-  loss += 0.5 * reg * np.sum(W**2)
+  #loss += 0.5 * reg * np.sum(W**2)
   
   #Gradient
   #dL_i/dW_j = 𝟙(s_i - s_yi > 0)*x_i
@@ -51,6 +51,6 @@ def svm_loss(W,X,y,reg=0.0):
   binary[np.arange(N), y] = -exceeded #Will contain 1 on every incorrect class
 
   dW = X.T.dot(binary) / N  # Shape: (D, C)
-  dW += reg * W #Regulization gradient
+  #dW += reg * W #Regulization gradient
 
   return loss, dW

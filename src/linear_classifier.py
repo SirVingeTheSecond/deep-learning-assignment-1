@@ -17,7 +17,7 @@ class LinearClassifier:
     def train(self, X, y, X_val=None, y_val=None, learning_rate=1e-3, reg=1e-5, num_iters=200, batch_size=200,
               print_every=100):
         num_train = X.shape[0]
-        iterations_per_epoch = max(num_train // batch_size, 1)
+        num_batches = int(np.ceil(num_train / batch_size))
 
         loss_history = []
         train_acc_history = []
@@ -25,31 +25,33 @@ class LinearClassifier:
 
         for it in range(num_iters):
             # Sample minibatch
-            batch_indices = np.random.choice(num_train, batch_size, replace=True)
-            x_batch = X[batch_indices]
-            y_batch = y[batch_indices]
+            x_batches = np.array_split(X, num_batches)
+            y_batches = np.array_split(y, num_batches)
+            avg_loss = 0
+            for x_batch, y_batch in zip(x_batches, y_batches):
+                avg_loss = 0
+                if self.loss_type == 'softmax':
+                    loss, gradient = softmax_loss(self.W, x_batch, y_batch, reg)
+                elif self.loss_type == 'svm':
+                    loss, gradient = svm_loss(self.W, x_batch, y_batch, reg)
 
-            if self.loss_type == 'softmax':
-                loss, gradient = softmax_loss(self.W, x_batch, y_batch, reg)
-            elif self.loss_type == 'svm':
-                loss, gradient = svm_loss(self.W, x_batch, y_batch, reg)
-
-            self.W -= gradient * learning_rate
-            loss_history.append(loss)
+                #Apply combined loss
+                self.W -= gradient * learning_rate
+                avg_loss += loss
+                loss_history.append(loss)
 
             if (it + 1) % print_every == 0:
-                print(str(it + 1) + "/" + str(num_iters) + " " + str(loss))
+                print(str(it + 1) + "/" + str(num_iters) + " " + str(avg_loss / num_batches))
 
             # Check accuracy every epoch
-            if it % iterations_per_epoch == 0:
-                train_pred = self.predict(x_batch)
-                train_acc = np.mean(train_pred == y_batch)
-                train_acc_history.append(train_acc)
+            train_pred = self.predict(x_batch)
+            train_acc = np.mean(train_pred == y_batch)
+            train_acc_history.append(train_acc)
 
-                if X_val is not None and y_val is not None:
-                    val_pred = self.predict(X_val)
-                    val_acc = np.mean(val_pred == y_val)
-                    val_acc_history.append(val_acc)
+            if X_val is not None and y_val is not None:
+                val_pred = self.predict(X_val)
+                val_acc = np.mean(val_pred == y_val)
+                val_acc_history.append(val_acc)
 
         return {
             'loss_history': loss_history,
