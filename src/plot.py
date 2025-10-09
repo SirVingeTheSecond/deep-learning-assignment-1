@@ -126,7 +126,7 @@ def plot_training_curves(hist, title, filename):
 
 
 def plot_confusion_matrix(y_true, y_pred, title, filename):
-    cm = confusion_matrix(y_true, y_pred)
+    cm = confusion_matrix(y_true, y_pred, normalize='true')
     plt.figure(figsize=(10, 8))
     plt.imshow(cm, cmap='Blues')
     plt.title(title)
@@ -139,7 +139,7 @@ def plot_confusion_matrix(y_true, y_pred, title, filename):
     # Add text annotations
     for i in range(len(class_names)):
         for j in range(len(class_names)):
-            plt.text(j, i, str(cm[i, j]), ha='center', va='center',
+            plt.text(j, i, str(round(cm[i, j], 2)), ha='center', va='center',
                      color='white' if cm[i, j] > cm.max() / 2 else 'black')
 
     plt.xlabel('Predicted Label')
