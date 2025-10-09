@@ -285,6 +285,8 @@ class FullyConnectedNN:
 
         iteration = 0
         for epoch in range(num_epochs):
+            epoch_losses = []
+
             # Shuffle data at the start of each epoch
             permutation = np.random.permutation(num_train)
             X_shuffled = X[permutation]
@@ -305,8 +307,9 @@ class FullyConnectedNN:
                 grads = self.backward(cache, y_batch)
 
                 self.update_params(grads, learning_rate, v=v, optimizer=optimizer, t=iteration)
+                epoch_losses.append(loss)
 
-                loss_history.append(loss)
+            loss_history.append(np.mean(epoch_losses))
 
             # After each epoch
             train_acc = np.mean(self.predict(X) == y)
