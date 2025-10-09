@@ -5,8 +5,8 @@ Configuration file for Deep Learning Assignment 1
 # Set to True to run the model, False to skip
 config = {
     'run_knn': False,
-    'run_linear': True,
-    'run_nn': False,
+    'run_linear': False,
+    'run_nn': True,
 }
 
 # Random seed to reproduce our results
@@ -16,9 +16,9 @@ SEED = 42
 # Image resolution (28x28)
 DATA_SIZE = 28
 # Number of training samples to use (None for all)
-SUBSAMPLE_TRAIN = None
+SUBSAMPLE_TRAIN = 5000
 # Number of validation samples for NN (None for all)
-SUBSAMPLE_VAL = 500
+SUBSAMPLE_VAL = 1000
 
 # Output config
 PLOTS_DIR = "../plots"
@@ -47,9 +47,9 @@ LINEAR_BATCH_SIZE = 1000
 LINEAR_PRINT_EVERY = 10
 
 # Neural network hyperparameters for grid search
-NN_HIDDEN_SIZES = [100, 200, 500]
+NN_HIDDEN_SIZES = [50, 100, 200]
 NN_LEARNING_RATES = [0.001, 0.005, 0.01]
-NN_REGULARIZATIONS = [0.0001, 0.001, 0.01]
+NN_REGULARIZATIONS = [0.01, 0.05, 0.1]
 NN_OPTIMIZERS = ['sgd', 'momentum', 'adam']
 NN_NUM_ITERS = 200
 NN_BATCH_SIZE = 64

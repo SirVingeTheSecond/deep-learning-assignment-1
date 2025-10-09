@@ -393,7 +393,6 @@ def plot_nn_training_loss(history, filename):
     plt.close()
     print(f"Saved plot: {filename}")
 
-
 def plot_nn_accuracy_per_epoch(history, filename):
     """
     Plot training and validation accuracy per epoch
@@ -412,3 +411,176 @@ def plot_nn_accuracy_per_epoch(history, filename):
         plt.savefig(filename, dpi=300, bbox_inches='tight')
         plt.close()
         print(f"Saved plot: {filename}")
+
+def plot_per_class_accuracy(y_true, y_pred, title, filename):
+    """Plot per-class accuracy as a bar chart"""
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
+
+    accuracies = []
+    support = []
+    for i in range(len(CLASS_NAMES)):
+        mask = y_true == i
+        if np.sum(mask) > 0:
+            acc = np.mean(y_pred[mask] == y_true[mask]) * 100
+            accuracies.append(acc)
+            support.append(np.sum(mask))
+        else:
+            accuracies.append(0)
+            support.append(0)
+
+    # Left plot: Accuracy per class
+    bars = ax1.bar(range(len(CLASS_NAMES)), accuracies, color='steelblue', alpha=0.8, edgecolor='black')
+    ax1.set_xlabel('Class', fontsize=12)
+    ax1.set_ylabel('Accuracy (%)', fontsize=12)
+    ax1.set_title('Per-Class Accuracy', fontsize=14, fontweight='bold')
+    ax1.set_xticks(range(len(CLASS_NAMES)))
+    ax1.set_xticklabels(CLASS_NAMES, rotation=45, ha='right')
+    ax1.grid(True, alpha=0.3, axis='y')
+    ax1.axhline(y=np.mean(accuracies), color='red', linestyle='--',
+                label=f'Mean: {np.mean(accuracies):.1f}%', linewidth=2)
+    ax1.legend()
+
+    # Add value labels
+    for bar, acc in zip(bars, accuracies):
+        ax1.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 1,
+                 f'{acc:.1f}%', ha='center', va='bottom', fontsize=9)
+
+    # Right plot: Accuracy vs sample count
+    ax2.scatter(support, accuracies, s=100, alpha=0.6, c=accuracies, cmap='viridis', edgecolor='black')
+    for i, (supp, acc) in enumerate(zip(support, accuracies)):
+        ax2.annotate(CLASS_NAMES[i], (supp, acc), fontsize=8,
+                     xytext=(5, 5), textcoords='offset points')
+    ax2.set_xlabel('Number of Samples', fontsize=12)
+    ax2.set_ylabel('Accuracy (%)', fontsize=12)
+    ax2.set_title('Accuracy vs Class Distribution', fontsize=14, fontweight='bold')
+    ax2.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig(filename, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"Saved plot: {filename}")
+
+
+def plot_optimizer_convergence(results_dict, plots_dir):
+    """
+    Compare convergence speed of different optimizers
+    Results_dict should have format: {optimizer: history_dict}
+    """
+    plt.figure(figsize=(15, 5))
+
+    # Loss convergence
+    plt.subplot(1, 3, 1)
+    for opt, hist in results_dict.items():
+        if 'loss_history' in hist and len(hist['loss_history']) > 0:
+            # Smooth the loss for visibility
+            window = max(len(hist['loss_history']) // 50, 10)
+            smoothed = np.convolve(hist['loss_history'],
+                                   np.ones(window) / window, mode='valid')
+            plt.plot(smoothed, label=opt, linewidth=2)
+    plt.xlabel('Iteration')
+    plt.ylabel('Loss')
+    plt.title('Loss Convergence by Optimizer')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.yscale('log')
+
+    # Training accuracy convergence
+    plt.subplot(1, 3, 2)
+    for opt, hist in results_dict.items():
+        if 'train_acc_history' in hist:
+            plt.plot(hist['train_acc_history'], label=opt, linewidth=2)
+    plt.xlabel('Epoch')
+    plt.ylabel('Training Accuracy')
+    plt.title('Training Accuracy by Optimizer')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+
+    # Validation accuracy convergence
+    plt.subplot(1, 3, 3)
+    for opt, hist in results_dict.items():
+        if 'val_acc_history' in hist:
+            plt.plot(hist['val_acc_history'], label=opt, linewidth=2)
+    plt.xlabel('Epoch')
+    plt.ylabel('Validation Accuracy')
+    plt.title('Validation Accuracy by Optimizer')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig(f"{plots_dir}/13_optimizer_convergence.png", dpi=300, bbox_inches='tight')
+    plt.close()
+
+def plot_overfitting_analysis(history, filename):
+    """Visualize overfitting through train-val gap"""
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+
+    epochs = range(1, len(history['train_acc_history']) + 1)
+
+    # Left: Train vs Val accuracy
+    ax1.plot(epochs, history['train_acc_history'], 'b-', label='Training', linewidth=2)
+    ax1.plot(epochs, history['val_acc_history'], 'r-', label='Validation', linewidth=2)
+    ax1.fill_between(epochs, history['train_acc_history'],
+                     history['val_acc_history'], alpha=0.3, color='yellow',
+                     label='Generalization Gap')
+    ax1.set_xlabel('Epoch')
+    ax1.set_ylabel('Accuracy')
+    ax1.set_title('Training vs Validation Accuracy')
+    ax1.legend()
+    ax1.grid(True, alpha=0.3)
+
+    # Right: Gap over time
+    gap = np.array(history['train_acc_history']) - np.array(history['val_acc_history'])
+    colors = ['red' if g > 0.1 else 'orange' if g > 0.05 else 'green' for g in gap]
+    ax2.bar(epochs, gap * 100, color=colors, alpha=0.7)
+    ax2.axhline(y=5, color='orange', linestyle='--', label='5% threshold')
+    ax2.axhline(y=10, color='red', linestyle='--', label='10% threshold')
+    ax2.set_xlabel('Epoch')
+    ax2.set_ylabel('Train-Val Gap (%)')
+    ax2.set_title('Overfitting Indicator')
+    ax2.legend()
+    ax2.grid(True, alpha=0.3, axis='y')
+
+    plt.tight_layout()
+    plt.savefig(filename, dpi=300, bbox_inches='tight')
+    plt.close()
+
+
+def plot_nn_heatmap(results_list, plots_dir):
+    """Create heatmap for LR vs Reg for best optimizer"""
+    # Find best optimizer
+    best_opt = max(set(r['opt'] for r in results_list),
+                   key=lambda opt: np.mean([r['val_acc'] for r in results_list if r['opt'] == opt]))
+
+    opt_results = [r for r in results_list if r['opt'] == best_opt]
+
+    lrs = sorted(set(r['lr'] for r in opt_results))
+    regs = sorted(set(r['reg'] for r in opt_results))
+
+    # Create matrix
+    matrix = np.zeros((len(regs), len(lrs)))
+    for r in opt_results:
+        i = regs.index(r['reg'])
+        j = lrs.index(r['lr'])
+        matrix[i, j] = r['val_acc'] * 100
+
+    plt.figure(figsize=(10, 8))
+    im = plt.imshow(matrix, cmap='viridis', aspect='auto')
+    plt.colorbar(im, label='Validation Accuracy (%)')
+
+    plt.xticks(range(len(lrs)), [f'{lr:.0e}' for lr in lrs], rotation=45)
+    plt.yticks(range(len(regs)), [f'{reg:.0e}' for reg in regs])
+    plt.xlabel('Learning Rate')
+    plt.ylabel('Regularization Strength')
+    plt.title(f'Hyperparameter Heatmap (Optimizer: {best_opt})')
+
+    # Add text annotations
+    for i in range(len(regs)):
+        for j in range(len(lrs)):
+            plt.text(j, i, f'{matrix[i, j]:.1f}',
+                     ha='center', va='center',
+                     color='white' if matrix[i, j] < matrix.max() * 0.7 else 'black')
+
+    plt.tight_layout()
+    plt.savefig(f"{plots_dir}/14_nn_heatmap_{best_opt}.png", dpi=300, bbox_inches='tight')
+    plt.close()

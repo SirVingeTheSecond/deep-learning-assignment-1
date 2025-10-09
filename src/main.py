@@ -37,6 +37,8 @@ from plot import (
     plot_nn_hyperparameter_results,
     plot_model_comparison,
     visualize_nn_weights,
+    plot_nn_training_loss,
+    plot_nn_accuracy_per_epoch,
 )
 
 np.random.seed(SEED)
@@ -48,6 +50,12 @@ def run_knn(X_train, y_train, X_val, y_val, X_test, y_test, plots_dir):
     print("\n" + "=" * 60)
     print("PART 1: k-Nearest Neighbors")
     print("=" * 60)
+
+    print("\nRunning k-Nearest Neighbors with parameters:")
+    print(f"K values: {KNN_K_VALUES}")
+    print(f"Distance metrics: {KNN_DISTANCE_METRICS}")
+    print(f"Train samples: {len(y_train)}, Validation samples: {len(y_val)}, Test samples: {len(y_test)}")
+    print(f"Feature dimension: {X_train.shape[1]}")
 
     knn = KNearestNeighbor()
     knn.train(X_train, y_train)
@@ -113,6 +121,12 @@ def run_linear_classifiers(X_train, y_train, X_val, y_val, X_test, y_test, plots
     print("\n" + "=" * 60)
     print("PART 2: Linear Classifiers")
     print("=" * 60)
+
+    print("\nRunning Linear Classifiers with parameters:")
+    print(f"Learning rates: {LINEAR_LEARNING_RATES}")
+    print(f"Regularizations: {LINEAR_REGULARIZATIONS}")
+    print(f"Iterations: {LINEAR_NUM_ITERS}, Batch size: {LINEAR_BATCH_SIZE}, Print every: {LINEAR_PRINT_EVERY}")
+    print(f"Number of classes: {num_classes}, Feature dimension: {dim}")
 
     def run_grid(loss_type, Xtr, ytr, Xva, yva, lrs, regs, num_iters, batch_size, print_every):
         best_val = -1.0
@@ -209,6 +223,14 @@ def run_neural_network(X_train_nn, y_train_nn, X_val_nn, y_val_nn, X_test_nn, y_
     print("\nLoading data for Neural Network...")
     print(f"NN data shapes: {X_train_nn.shape}, {X_val_nn.shape}, {X_test_nn.shape}")
 
+    print("\nRunning Neural Network with parameters:")
+    print(f"Hidden sizes: {NN_HIDDEN_SIZES}")
+    print(f"Learning rates: {NN_LEARNING_RATES}")
+    print(f"Regularizations: {NN_REGULARIZATIONS}")
+    print(f"Optimizers: {NN_OPTIMIZERS}")
+    print(f"Epochs: {NN_NUM_ITERS}, Batch size: {NN_BATCH_SIZE}, Print every: {NN_PRINT_EVERY}")
+    print(f"Classes: {num_classes}, Train samples: {len(y_train_nn)}, Val samples: {len(y_val_nn)}, Test samples: {len(y_test_nn)}")
+
     def run_nn_grid(Xtr, ytr, Xva, yva, hidden_sizes, lrs, regs, optimizers,
                     num_epochs=20, batch_size=64, print_every=10):
         """
@@ -284,6 +306,9 @@ def run_neural_network(X_train_nn, y_train_nn, X_val_nn, y_val_nn, X_test_nn, y_
     print(f"Final Neural Network test accuracy: {nn_test_acc:.2f}%")
 
     plot_nn_hyperparameter_results(nn_results, plots_dir)
+
+    plot_nn_training_loss(nn_hist, f"{plots_dir}/08_nn_training_loss.png")
+    plot_nn_accuracy_per_epoch(nn_hist, f"{plots_dir}/09_nn_training_accuracy.png")
 
     plot_confusion_matrix(y_test_nn, y_test_pred_nn, "Neural Network Confusion Matrix",
                           f"{plots_dir}/10_nn_confusion_matrix.png")
