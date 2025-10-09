@@ -1,9 +1,11 @@
+from matplotlib.colors import LogNorm
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix
 from math import ceil, sqrt
+from scipy.interpolate import griddata
 
-from config import CLASS_NAMES
+from config import CLASS_NAMES, LINEAR_LEARNING_RATES, LINEAR_REGULARIZATIONS
 
 def plot_class_distribution(plots_dir, y_train, y_test, y_val):
     plt.plot()
@@ -108,6 +110,84 @@ def plot_knn_validation_and_class_distribution(
     plt.close()
     print(f"Saved plot: {out}")
 
+
+def plot_linear_classifier_learned_weights(plots_dir, model_type, weights):
+    # Remove bias and transpose if needed
+    W = weights.transpose()[:, :-1]  # shape: (num_classes, input_dim)
+
+    fig, ax = plt.subplots(2, 4, figsize=(12, 6))
+
+    for i in range(W.shape[0]):
+        img = W[i].reshape(28, 28, 3)
+
+        row, col = divmod(i, 4)  # Determine position in 2x4 grid
+        ax[row, col].imshow(img * 10)  # Scale color up a bit
+        ax[row, col].set_title(CLASS_NAMES[i], fontsize=10)
+        ax[row, col].axis('off')
+
+    # Add a main title for the figure
+    fig.suptitle(f"Learned Weights for {model_type} Classifier", fontsize=14)
+
+    plt.tight_layout()
+    out = f"{plots_dir}/linear_{model_type}_weights_visualized.png"
+    plt.savefig(out, dpi=300, bbox_inches='tight')
+    plt.close()
+
+def plot_linear_classifier_hyperparameters(plots_dir, results, loss_type):
+    # Extract columns
+    x = np.array([r[0] for r in results])   # e.g. 0.0001, 0.0005, 0.001
+    y = np.array([r[1] for r in results])   # e.g. 1, 2
+    z = np.array([r[2] for r in results])   # your score
+
+    # Interpolate in log-space for X
+    log_x = np.log10(x)
+    log_y = np.log10(y)
+    xi = np.linspace(log_x.min(), log_x.max(), 200)
+    yi = np.linspace(log_y.min(), log_y.max(), 200)
+    Xi, Yi = np.meshgrid(xi, yi)
+
+    # Interpolate using linear method
+    Zi = griddata((log_x, log_y), z, (Xi, Yi), method='linear')
+
+    fig, ax = plt.subplots()
+
+    # Show gradient background
+    im = ax.imshow(
+        Zi,
+        extent=(log_x.min(), log_x.max(), log_y.min(), log_y.max()),
+        origin='lower',
+        cmap='plasma',
+        aspect='auto',
+        vmin=1/8,
+        vmax=1
+    )
+
+    # Overlay original scatter points
+    sc = ax.scatter(log_x, log_y, c=z, cmap='plasma', edgecolor='black', s=100, vmin=1/8, vmax=1)
+
+    best_idx = np.argmax(z)
+    ax.scatter(log_x[best_idx], log_y[best_idx], s=200, edgecolor='yellow', facecolor='none', linewidth=2)
+
+    # Colorbar
+    plt.colorbar(im, ax=ax, label='Validation Accuracy')
+
+    # Log-scale ticks: convert back to actual learning rate values
+    x_ticks = np.array(LINEAR_LEARNING_RATES)
+    ax.set_xticks(np.log10(x_ticks))
+    ax.set_xticklabels(["{:.0e}".format(v) for v in x_ticks])
+
+    y_ticks = np.array(LINEAR_REGULARIZATIONS) 
+    ax.set_yticks(np.log10(y_ticks))
+    ax.set_yticklabels(["{:.0e}".format(v) for v in y_ticks])
+
+    plt.xlabel("Learning Rate")
+    plt.ylabel("Regularization Strength")
+    plt.title(f"Hyperparameter Surface ({loss_type})")
+
+    out = f"{plots_dir}/08_linear_hyperparam_results_{loss_type}.png"
+    plt.savefig(out, dpi=300, bbox_inches='tight')
+    plt.show()
+    plt.close()
 
 def plot_training_curves(hist, title, filename):
     plt.figure(figsize=(7, 4))

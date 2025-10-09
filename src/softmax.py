@@ -29,7 +29,7 @@ def softmax_loss(W, X, y, reg=0):
     correct_class_probs = softmax_probs[np.arange(N), y]
     data_loss = -np.sum(np.log(correct_class_probs)) / N
     reg_loss = 0.5 * reg * np.sum(W * W)
-    loss = data_loss# + reg_loss
+    loss = data_loss + reg_loss
 
     # Gradient: (predicted_prob - true_label) weighted by input
     y_one_hot = np.zeros_like(softmax_probs)
