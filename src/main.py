@@ -209,7 +209,7 @@ def run_neural_network(X_train_nn, y_train_nn, X_val_nn, y_val_nn, X_test_nn, y_
     print(f"NN data shapes: {X_train_nn.shape}, {X_val_nn.shape}, {X_test_nn.shape}")
 
     def run_nn_grid(Xtr, ytr, Xva, yva, hidden_sizes, lrs, regs, optimizers,
-                    num_iters, batch_size, print_every):
+                    num_epochs=20, batch_size=64, print_every=10):
         """
         Hyperparameter search for neural network.
         Similar to run_grid for linear classifiers but with more hyperparameters.
@@ -242,7 +242,7 @@ def run_neural_network(X_train_nn, y_train_nn, X_val_nn, y_val_nn, X_test_nn, y_
                             Xtr, ytr,
                             X_val=Xva, y_val=yva,
                             learning_rate=lr, reg=reg,
-                            num_iters=num_iters, batch_size=batch_size,
+                            num_epochs=num_epochs, batch_size=batch_size,
                             optimizer=opt, print_every=print_every
                         )
 

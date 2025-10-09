@@ -1,5 +1,6 @@
 import numpy as np
 from medmnist import BloodMNIST
+from numpy.random import permutation
 
 
 def load_data_nn(size=28, subsample_train=1000, subsample_val=1000, seed=0):
@@ -254,13 +255,12 @@ class FullyConnectedNN:
                 self.params['b' + str(i)] -= learning_rate * mb_hat / (np.sqrt(vb_hat) + eps)
 
     def train(self, X, y, X_val=None, y_val=None, learning_rate=0.01, reg=0.01,
-              num_iters=200, batch_size=64, optimizer='adam', print_every=100):
+              num_epochs=100, batch_size=64, optimizer='adam', print_every=100):
         """
         Trains the model using the chosen optimizer.
         """
         self.reg_strength = reg
         num_train = X.shape[0]
-        iterations_per_epoch = max(num_train // batch_size, 1)
 
         loss_history = []
         train_acc_history = []
@@ -283,35 +283,44 @@ class FullyConnectedNN:
                 v['mb' + str(i)] = np.zeros_like(self.params['b' + str(i)])
                 v['vb' + str(i)] = np.zeros_like(self.params['b' + str(i)])
 
-        for it in range(num_iters):
-            # Sample minibatch
-            batch_indices = np.random.choice(num_train, batch_size, replace=True)
-            X_batch = X[batch_indices]
-            y_batch = y[batch_indices]
+        iteration = 0
+        for epoch in range(num_epochs):
+            # Shuffle data at the start of each epoch
+            permutation = np.random.permutation(num_train)
+            X_shuffled = X[permutation]
+            y_shuffled = y[permutation]
 
-            A_last, cache = self.forward(X_batch)
-            loss = self.compute_loss(A_last, y_batch)
-            grads = self.backward(cache, y_batch)
+            for i in range(0, num_train, batch_size):
+                iteration += 1
 
-            # pass current time-step to optimizer (used by Adam for bias-correction)
-            self.update_params(grads, learning_rate, v=v, optimizer=optimizer, t=it + 1)
+                # Get batch - there is a chance the last batch might be smaller I would assume
+                X_batch = X_shuffled[i:i + batch_size]
+                y_batch = y_shuffled[i:i + batch_size]
 
-            loss_history.append(loss)
+                # Forward pass
+                A_last, cache = self.forward(X_batch)
+                loss = self.compute_loss(A_last, y_batch)
 
-            # show results per epoch
-            if (it + 1) % iterations_per_epoch == 0:
-                train_acc = np.mean(self.predict(X) == y)
-                train_acc_history.append(train_acc)
-                if X_val is not None and y_val is not None:
-                    val_acc = np.mean(self.predict(X_val) == y_val)
-                    val_acc_history.append(val_acc)
+                # Backward pass
+                grads = self.backward(cache, y_batch)
 
-            if (it + 1) % print_every == 0:
-                msg = f"{it + 1}/{num_iters} loss={loss:.4f}"
-                if len(train_acc_history):
-                    msg += f" train_acc={train_acc_history[-1]:.4f}"
-                if len(val_acc_history):
-                    msg += f" val_acc={val_acc_history[-1]:.4f}"
+                self.update_params(grads, learning_rate, v=v, optimizer=optimizer, t=iteration)
+
+                loss_history.append(loss)
+
+            # After each epoch
+            train_acc = np.mean(self.predict(X) == y)
+            train_acc_history.append(train_acc)
+
+            if X_val is not None and y_val is not None:
+                val_acc = np.mean(self.predict(X_val) == y_val)
+                val_acc_history.append(val_acc)
+
+            # Print progress
+            if (epoch + 1) % print_every == 0:
+                msg = f"Epoch {epoch + 1}/{num_epochs} loss={loss:.4f} train_acc={train_acc:.4f}"
+                if X_val is not None:
+                    msg += f" val_acc={val_acc:.4f}"
                 print(msg)
 
         return {
