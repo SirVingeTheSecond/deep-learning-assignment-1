@@ -1,4 +1,5 @@
 import os
+from joblib import Parallel, delayed
 import numpy as np
 import random
 
@@ -33,6 +34,7 @@ from plot import (
     plot_class_distribution,
     plot_knn_validation_and_class_distribution,
     plot_linear_classifier_hyperparameters,
+    plot_linear_classifier_learned_weights,
     plot_training_curves,
     plot_confusion_matrix,
     plot_nn_hyperparameter_results,
@@ -124,37 +126,57 @@ def run_linear_classifiers(X_train, y_train, X_val, y_val, X_test, y_test, plots
         print("lr\treg\tVal Accuracy")
         print("-" * 35)
 
+        # ----------------------------------
+        # Function to run ONE combination
+        # ----------------------------------
+        def train_one(lr, reg):
+            clf = LinearClassifier(
+                input_dim=dim,
+                num_classes=num_classes,
+                loss_type=loss_type
+            )
+
+            hist = clf.train(
+                Xtr, ytr,
+                X_val=Xva, y_val=yva,
+                learning_rate=lr, reg=reg,
+                num_iters=num_iters, batch_size=batch_size,
+                print_every=print_every
+            )
+
+            if hist["val_acc_history"]:
+                val_acc = hist["val_acc_history"][-1]
+            else:
+                val_acc = np.mean(clf.predict(Xva) == yva)
+
+            return (lr, reg, val_acc, clf, hist)
+
+        # ----------------------------------
+        # Run all combinations in parallel
+        # ----------------------------------
+        parallel_results = Parallel(n_jobs=-1, verbose=1)(
+            delayed(train_one)(lr, reg) for lr in lrs for reg in regs
+        )
+
         results = []
+        # Find best
+        for lr, reg, val_acc, clf, hist in parallel_results:
+            results.append([lr, reg, val_acc])
+            print(f"{lr:<7g}\t{reg:<7g}\t{val_acc * 100:.2f}%")
 
-        for lr in lrs:
-            for reg in regs:
-                clf = LinearClassifier(input_dim=dim, num_classes=num_classes, loss_type=loss_type)
-                hist = clf.train(
-                    Xtr, ytr,
-                    X_val=Xva, y_val=yva,
-                    learning_rate=lr, reg=reg,
-                    num_iters=num_iters, batch_size=batch_size,
-                    print_every=print_every
-                )
+            if val_acc > best_val:
+                best_val = val_acc
+                best_tuple = (clf, lr, reg)
+                best_hist = hist
 
-                if hist["val_acc_history"]:
-                    val_acc = hist["val_acc_history"][-1]
-                else:
-                    val_acc = np.mean(clf.predict(Xva) == yva)
-
-                results.append([lr, reg, val_acc])
-                print(f"{lr:<7g}\t{reg:<7g}\t{val_acc * 100:.2f}%")
-
-                if val_acc > best_val:
-                    best_val = val_acc
-                    best_tuple = (clf, lr, reg)
-                    best_hist = hist
-
-
+        # ----------------------------------
+        # Final best result
+        # ----------------------------------
         clf, lr, reg = best_tuple
         print(f"\nBest {loss_type.capitalize()}: lr={lr}, reg={reg} ({best_val * 100:.2f}%)\n")
         print(results)
-        plot_linear_classifier_hyperparameters(plots_dir, results, loss_type)
+
+        #plot_linear_classifier_hyperparameters(plots_dir, results, loss_type)
         return clf, lr, reg, best_hist
 
     # SVM
@@ -166,6 +188,7 @@ def run_linear_classifiers(X_train, y_train, X_val, y_val, X_test, y_test, plots
     y_test_pred_svm = svm_model.predict(X_test)
     svm_test_acc = np.mean(y_test_pred_svm == y_test) * 100
     print(f"Final SVM test accuracy: {svm_test_acc:.2f}%")
+    plot_linear_classifier_learned_weights(plots_dir, "svm", svm_model.W)
 
     # Softmax
     softmax_model, best_lr_soft, best_reg_soft, softmax_hist = run_grid(
@@ -176,6 +199,7 @@ def run_linear_classifiers(X_train, y_train, X_val, y_val, X_test, y_test, plots
     y_test_pred_soft = softmax_model.predict(X_test)
     softmax_test_acc = np.mean(y_test_pred_soft == y_test) * 100
     print(f"Final Softmax test accuracy: {softmax_test_acc:.2f}%")
+    plot_linear_classifier_learned_weights(plots_dir, "softmax", softmax_model.W)
 
     # Training curves
     plot_training_curves(svm_hist, "SVM Training (loss + epoch acc)", f"{plots_dir}/03_svm_training_curves.png")
