@@ -265,61 +265,75 @@ def run_neural_network(X_train_nn, y_train_nn, X_val_nn, y_val_nn, X_test_nn, y_
     def run_nn_grid(Xtr, ytr, Xva, yva, hidden_sizes, lrs, regs, optimizers,
                     num_epochs=20, batch_size=64, print_every=10):
         """
-        Hyperparameter search for neural network.
-        Similar to run_grid for linear classifiers but with more hyperparameters.
+        Hyperparameter search for neural network running in parallel.
         """
         best_val = -1.0
         best_tuple = None
         best_hist = None
-        all_results = []
 
-        print("\nOptimizing Neural Network:")
+        print("\nOptimizing Neural Network (PARALLEL):")
         print("Hidden\tLR\tReg\tOptimizer\tVal Accuracy")
         print("-" * 60)
 
-        # Use input dimension from NN data (no bias column)
         input_dim = Xtr.shape[1]
 
-        for hidden_size in hidden_sizes:
-            for lr in lrs:
-                for reg in regs:
-                    for opt in optimizers:
-                        layers = [input_dim, hidden_size, num_classes]
-                        nn = FullyConnectedNN(
-                            layers=layers,
-                            reg_strength=reg,
-                            loss='softmax',
-                            seed=SEED
-                        )
+        # ----------------------------------
+        # Function to train ONE combination
+        # ----------------------------------
+        def train_one(hidden_size, lr, reg, opt):
+            layers = [input_dim, hidden_size, num_classes]
+            nn = FullyConnectedNN(
+                layers=layers,
+                reg_strength=reg,
+                loss='softmax',
+                seed=SEED
+            )
 
-                        hist = nn.train(
-                            Xtr, ytr,
-                            X_val=Xva, y_val=yva,
-                            learning_rate=lr, reg=reg,
-                            num_epochs=num_epochs, batch_size=batch_size,
-                            optimizer=opt, print_every=print_every
-                        )
+            hist = nn.train(
+                Xtr, ytr,
+                X_val=Xva, y_val=yva,
+                learning_rate=lr, reg=reg,
+                num_epochs=num_epochs, batch_size=batch_size,
+                optimizer=opt, print_every=print_every
+            )
 
-                        if hist["val_acc_history"]:
-                            val_acc = hist["val_acc_history"][-1]
-                        else:
-                            val_acc = np.mean(nn.predict(Xva) == yva)
+            if hist["val_acc_history"]:
+                val_acc = hist["val_acc_history"][-1]
+            else:
+                val_acc = np.mean(nn.predict(Xva) == yva)
 
-                        print(f"{hidden_size}\t{lr:<7g}\t{reg:<7g}\t{opt}\t\t{val_acc * 100:.2f}%")
+            return (hidden_size, lr, reg, opt, val_acc, nn, hist)
 
-                        # Track the results
-                        all_results.append({
-                            'hidden': hidden_size,
-                            'lr': lr,
-                            'reg': reg,
-                            'opt': opt,
-                            'val_acc': val_acc
-                        })
+        # ----------------------------------
+        # Run all combinations in PARALLEL
+        # ----------------------------------
+        parallel_results = Parallel(n_jobs=-1, verbose=1)(
+            delayed(train_one)(h, lr, reg, opt)
+            for h in hidden_sizes
+            for lr in lrs
+            for reg in regs
+            for opt in optimizers
+        )
 
-                        if val_acc > best_val:
-                            best_val = val_acc
-                            best_tuple = (nn, hidden_size, lr, reg, opt)
-                            best_hist = hist
+        # ----------------------------------
+        # Process results and find best
+        # ----------------------------------
+        all_results = []
+        for h_size, lr, reg, opt, val_acc, nn, hist in parallel_results:
+            print(f"{h_size}\t{lr:<7g}\t{reg:<7g}\t{opt}\t\t{val_acc * 100:.2f}%")
+
+            all_results.append({
+                'hidden': h_size,
+                'lr': lr,
+                'reg': reg,
+                'opt': opt,
+                'val_acc': val_acc
+            })
+
+            if val_acc > best_val:
+                best_val = val_acc
+                best_tuple = (nn, h_size, lr, reg, opt)
+                best_hist = hist
 
         nn, h_size, lr, reg, opt = best_tuple
         print(f"\nBest NN: hidden={h_size}, lr={lr}, reg={reg}, opt={opt} ({best_val * 100:.2f}%)\n")
