@@ -48,8 +48,8 @@ LINEAR_PRINT_EVERY = 10
 
 # Neural network hyperparameters for grid search
 NN_HIDDEN_SIZES = [50, 100, 200]
-NN_LEARNING_RATES = [0.001, 0.005, 0.01]
-NN_REGULARIZATIONS = [0.01, 0.05, 0.1]
+NN_LEARNING_RATES = [1e-4, 5e-4, 1e-3, 5e-3, 1e-2, 5e-2, 1e-1]
+NN_REGULARIZATIONS = [1e-4, 1e-3, 1e-2, 5e-2, 1e-1, 5e-1]
 NN_OPTIMIZERS = ['sgd', 'momentum', 'adam']
 NN_NUM_ITERS = 200
 NN_BATCH_SIZE = 256

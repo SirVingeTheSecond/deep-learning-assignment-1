@@ -345,9 +345,10 @@ def visualize_grid(Xs, ubound=255.0, padding=1):
         y1 += H + padding
     return grid
 
+
 def visualize_nn_weights(net, plots_dir):
     """
-    Visualize the learned weights of the neural network comprehensively.
+    ENHANCED: Visualize the learned weights with improved handling of narrow bottlenecks.
     Creates a combined visualization showing both first and second layer weights.
     """
     fig = plt.figure(figsize=(18, 14))
@@ -355,7 +356,6 @@ def visualize_nn_weights(net, plots_dir):
     # ============================================================
     # PLOT 1: First Layer Weights (Feature Detectors)
     # ============================================================
-    # Use a 4x4 grid, with top row spanning all columns
     ax1 = plt.subplot2grid((4, 4), (0, 0), colspan=4)
     W1 = net.params['W1']
     W1_reshaped = W1.reshape(3, 28, 28, -1).transpose(3, 1, 2, 0)
@@ -369,19 +369,27 @@ def visualize_nn_weights(net, plots_dir):
 
     # Add text explaining what we're seeing
     n_features = W1_reshaped.shape[0]
+    hidden_size = net.layers[1]
     ax1.text(0.5, -0.05,
-             f'Showing {n_features} learned feature detectors from input layer',
+             f'Showing {n_features} learned feature detectors from input layer (hidden size: {hidden_size})',
              transform=ax1.transAxes, ha='center', fontsize=10, style='italic')
 
     # Add title for second section
     fig.text(0.5, 0.42, 'Output Layer Weights (Class-Specific Patterns)',
              ha='center', fontsize=14, fontweight='bold')
-    fig.text(0.5, 0.39,
-             'Reconstructed input space patterns emphasized by each class',
-             ha='center', fontsize=10, style='italic')
+
+    # IMPROVED: Add warning if bottleneck is too narrow
+    if hidden_size < 100:
+        fig.text(0.5, 0.39,
+                 f'⚠ Note: Narrow hidden layer ({hidden_size} neurons) limits spatial reconstruction quality',
+                 ha='center', fontsize=10, style='italic', color='red')
+    else:
+        fig.text(0.5, 0.39,
+                 'Reconstructed input space patterns emphasized by each class',
+                 ha='center', fontsize=10, style='italic')
 
     # ============================================================
-    # PLOT 2: Second Layer Weights (Class-Specific) - 2 rows x 4 cols
+    # PLOT 2: Second Layer Weights - IMPROVED METHOD
     # ============================================================
     W2 = net.params['W2']  # Shape: (hidden_size, num_classes)
 
@@ -393,8 +401,19 @@ def visualize_nn_weights(net, plots_dir):
         # Get weights for this class from hidden layer
         class_weights = W2[:, i]
 
-        # Reshape back through W1 to see what each class emphasizes in input space
-        reconstructed = np.dot(net.params['W1'], class_weights)
+        # IMPROVED: Use top-k neurons weighted combination for better reconstruction
+        if hidden_size < 100:
+            # For narrow layers, use top contributing neurons
+            k = min(20, hidden_size)
+            top_indices = np.argsort(np.abs(class_weights))[-k:]
+
+            reconstructed = np.zeros(W1.shape[0])
+            for idx in top_indices:
+                reconstructed += class_weights[idx] * W1[:, idx]
+        else:
+            # For wider layers, use all neurons
+            reconstructed = np.dot(W1, class_weights)
+
         img = reconstructed.reshape(28, 28, 3)
 
         # Normalize for visualization
@@ -407,14 +426,17 @@ def visualize_nn_weights(net, plots_dir):
     plt.tight_layout(rect=[0, 0, 1, 0.96])
     _save_and_close(f"{plots_dir}/11_nn_learned_weights_comprehensive.png")
 
+
 def visualize_nn_weights_comparison(net, plots_dir):
     """
-    Create a direct comparison visualization matching the linear classifier format.
-    Shows only the output layer weights in the same 2x4 grid as linear classifiers.
+    ENHANCED: Create a direct comparison visualization matching the linear classifier format.
+    Shows only the output layer weights in the same 2x4 grid, with improved reconstruction.
     """
     fig, axes = plt.subplots(2, 4, figsize=(12, 6))
 
-    W2 = net.params['W2']  # Shape: (hidden_size, num_classes)
+    W1 = net.params['W1']  # (input_dim, hidden_size)
+    W2 = net.params['W2']  # (hidden_size, num_classes)
+    hidden_size = net.layers[1]
 
     for i in range(8):
         row, col = divmod(i, 4)
@@ -423,8 +445,19 @@ def visualize_nn_weights_comparison(net, plots_dir):
         # Get weights for this class
         class_weights = W2[:, i]
 
-        # Reconstruct what this class "sees" in input space
-        reconstructed = np.dot(net.params['W1'], class_weights)
+        # IMPROVED: Handle narrow bottlenecks better
+        if hidden_size < 100:
+            # Use weighted top-k approach
+            k = min(20, hidden_size)
+            top_indices = np.argsort(np.abs(class_weights))[-k:]
+
+            reconstructed = np.zeros(W1.shape[0])
+            for idx in top_indices:
+                reconstructed += class_weights[idx] * W1[:, idx]
+        else:
+            # Standard reconstruction for wider networks
+            reconstructed = np.dot(W1, class_weights)
+
         img = reconstructed.reshape(28, 28, 3)
 
         # Normalize and scale similar to linear classifier visualization
@@ -434,8 +467,11 @@ def visualize_nn_weights_comparison(net, plots_dir):
         ax.set_title(CLASS_NAMES[i], fontsize=10)
         ax.axis('off')
 
-    fig.suptitle("Neural Network Output Layer Weights (Class-Specific)",
-                 fontsize=14, fontweight='bold')
+    # IMPROVED: Add informative title
+    title = "Neural Network Output Layer Weights (Class-Specific)"
+    if hidden_size < 100:
+        title += f"\n(Narrow bottleneck: {hidden_size} neurons limits detail)"
+    fig.suptitle(title, fontsize=14, fontweight='bold')
 
     _save_and_close(f"{plots_dir}/11b_nn_weights_linear_comparison.png")
 
@@ -614,8 +650,8 @@ def plot_nn_hyperparameter_results(results_list, plots_dir):
 
 def plot_nn_hyperparameter_surfaces(results_list, plots_dir):
     """
-    Create hyperparameter surface plots for neural networks.
-    Shows LR vs Reg interaction for each optimizer.
+    ENHANCED: Create hyperparameter surface plots for neural networks with better data visibility.
+    Shows LR vs Reg interaction for each optimizer with larger markers and value labels.
     """
     optimizers = sorted(set(r['opt'] for r in results_list))
 
@@ -640,6 +676,11 @@ def plot_nn_hyperparameter_surfaces(results_list, plots_dir):
         y = np.array([r['reg'] for r in opt_results])
         z = np.array([r['val_acc'] * 100 for r in opt_results])
 
+        # Count unique values for grid info
+        unique_lrs = sorted(set(r['lr'] for r in opt_results))
+        unique_regs = sorted(set(r['reg'] for r in opt_results))
+        n_points = len(opt_results)
+
         # Create grid for interpolation
         log_x = np.log10(x)
         log_y = np.log10(y)
@@ -661,21 +702,27 @@ def plot_nn_hyperparameter_surfaces(results_list, plots_dir):
             vmax=min(z.max() + 5, 100)
         )
 
-        # Overlay scatter points
+        # ENHANCED: Larger scatter points with white edges
         sc = ax.scatter(log_x, log_y, c=z, cmap='plasma',
-                        edgecolor='black', s=100,
+                        edgecolor='white', s=300, linewidth=2,
                         vmin=max(z.min() - 5, 0),
-                        vmax=min(z.max() + 5, 100))
+                        vmax=min(z.max() + 5, 100),
+                        zorder=10)
+
+        # ENHANCED: Add value labels on each point
+        for i, (lx, ly, val) in enumerate(zip(log_x, log_y, z)):
+            ax.text(lx, ly, f'{val:.1f}',
+                    ha='center', va='center',
+                    fontsize=8, fontweight='bold',
+                    color='white' if val < 70 else 'black',
+                    zorder=11)
 
         # Highlight best point
         best_idx = np.argmax(z)
         ax.scatter(log_x[best_idx], log_y[best_idx],
-                   s=200, edgecolor='yellow', facecolor='none',
-                   linewidth=2, label=f'Best: {z[best_idx]:.2f}%')
-
-        # Get unique learning rates and regularizations for ticks
-        unique_lrs = sorted(set(r['lr'] for r in opt_results))
-        unique_regs = sorted(set(r['reg'] for r in opt_results))
+                   s=400, edgecolor='yellow', facecolor='none',
+                   linewidth=3, label=f'Best: {z[best_idx]:.2f}%',
+                   zorder=12)
 
         ax.set_xticks(np.log10(unique_lrs))
         ax.set_xticklabels([f'{lr:.0e}' for lr in unique_lrs], rotation=45)
@@ -685,13 +732,81 @@ def plot_nn_hyperparameter_surfaces(results_list, plots_dir):
         ax.set_xlabel('Learning Rate (log scale)')
         ax.set_ylabel('Regularization Strength (log scale)')
         ax.set_title(f'Optimizer: {opt}')
-        ax.legend()
+        ax.legend(loc='upper right')
         ax.grid(True, alpha=0.3)
+
+        # ENHANCED: Add grid size info
+        ax.text(0.02, 0.98, f'Grid: {len(unique_lrs)}×{len(unique_regs)} = {n_points} points',
+                transform=ax.transAxes,
+                verticalalignment='top',
+                bbox=dict(boxstyle='round', facecolor='white', alpha=0.8),
+                fontsize=9, zorder=15)
 
         # Add colorbar
         plt.colorbar(im, ax=ax, label='Validation Accuracy (%)')
 
     _save_and_close(f"{plots_dir}/07b_nn_hyperparameter_surfaces.png")
+
+
+def plot_nn_hyperparameter_grid_raw(results_list, plots_dir):
+    """
+    NEW: Show actual measured points without interpolation - honest visualization.
+    This complements the interpolated surface plots by showing exactly what was measured.
+    """
+    optimizers = sorted(set(r['opt'] for r in results_list))
+
+    fig, axes = plt.subplots(1, len(optimizers), figsize=(6 * len(optimizers), 5))
+    if len(optimizers) == 1:
+        axes = [axes]
+
+    for idx, opt in enumerate(optimizers):
+        ax = axes[idx]
+        opt_results = [r for r in results_list if r['opt'] == opt]
+
+        # Get unique values
+        lrs = sorted(set(r['lr'] for r in opt_results))
+        regs = sorted(set(r['reg'] for r in opt_results))
+
+        # Create matrix
+        matrix = np.full((len(regs), len(lrs)), np.nan)
+        for r in opt_results:
+            i = regs.index(r['reg'])
+            j = lrs.index(r['lr'])
+            matrix[i, j] = r['val_acc'] * 100
+
+        # Plot as heatmap (NO interpolation)
+        im = ax.imshow(matrix, cmap='plasma', aspect='auto',
+                       vmin=max(np.nanmin(matrix) - 5, 0),
+                       vmax=min(np.nanmax(matrix) + 5, 100))
+
+        # Proper tick labels
+        ax.set_xticks(range(len(lrs)))
+        ax.set_xticklabels([f'{lr:.0e}' for lr in lrs], rotation=45, ha='right')
+        ax.set_yticks(range(len(regs)))
+        ax.set_yticklabels([f'{reg:.0e}' for reg in regs])
+
+        # Annotate each cell with value
+        for i in range(len(regs)):
+            for j in range(len(lrs)):
+                if not np.isnan(matrix[i, j]):
+                    color = 'white' if matrix[i, j] < 70 else 'black'
+                    ax.text(j, i, f'{matrix[i, j]:.1f}',
+                            ha='center', va='center',
+                            color=color, fontweight='bold', fontsize=9)
+
+        # Highlight best cell
+        best_i, best_j = np.unravel_index(np.nanargmax(matrix), matrix.shape)
+        rect = plt.Rectangle((best_j - 0.5, best_i - 0.5), 1, 1,
+                             fill=False, edgecolor='yellow', linewidth=3)
+        ax.add_patch(rect)
+
+        ax.set_title(f'{opt.upper()}: Raw Measurements\n(No Interpolation)')
+        ax.set_xlabel('Learning Rate')
+        ax.set_ylabel('Regularization Strength')
+        plt.colorbar(im, ax=ax, label='Validation Accuracy (%)')
+
+    plt.tight_layout()
+    _save_and_close(f"{plots_dir}/07d_nn_hyperparameter_grid_raw.png")
 
 
 def plot_nn_hidden_size_surfaces(results_list, plots_dir):
@@ -800,7 +915,8 @@ def plot_nn_hidden_size_surfaces(results_list, plots_dir):
 
 def plot_nn_all_surfaces(results_list, plots_dir):
     """
-    Convenience function to create all NN hyperparameter surface plots.
+    ENHANCED: Convenience function to create all NN hyperparameter surface plots.
+    Now includes both interpolated and raw visualization.
 
     Args:
         results_list: List of dicts with keys 'hidden', 'lr', 'reg', 'opt', 'val_acc'
@@ -808,6 +924,7 @@ def plot_nn_all_surfaces(results_list, plots_dir):
     """
     print("Creating Neural Network hyperparameter surface plots...")
     plot_nn_hyperparameter_surfaces(results_list, plots_dir)
+    plot_nn_hyperparameter_grid_raw(results_list, plots_dir)  # NEW
     plot_nn_hidden_size_surfaces(results_list, plots_dir)
     print("Neural Network surface plots complete!")
 
