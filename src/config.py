@@ -16,9 +16,9 @@ SEED = 42
 # Image resolution (28x28)
 DATA_SIZE = 28
 # Number of training samples to use (None for all)
-SUBSAMPLE_TRAIN = 5000
+SUBSAMPLE_TRAIN = None
 # Number of validation samples for NN (None for all)
-SUBSAMPLE_VAL = 1000
+SUBSAMPLE_VAL = None
 
 # Output config
 PLOTS_DIR = "../plots"
@@ -52,5 +52,5 @@ NN_LEARNING_RATES = [0.001, 0.005, 0.01]
 NN_REGULARIZATIONS = [0.01, 0.05, 0.1]
 NN_OPTIMIZERS = ['sgd', 'momentum', 'adam']
 NN_NUM_ITERS = 200
-NN_BATCH_SIZE = 64
+NN_BATCH_SIZE = 256
 NN_PRINT_EVERY = 100
