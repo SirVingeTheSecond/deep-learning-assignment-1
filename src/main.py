@@ -362,7 +362,12 @@ def run_neural_network(X_train_nn, y_train_nn, X_val_nn, y_val_nn, X_test_nn, y_
     plot_nn_hyperparameter_results(nn_results, plots_dir)
 
     plot_nn_training_loss(nn_hist, f"{plots_dir}/08_nn_training_loss.png")
-    plot_nn_accuracy_per_epoch(nn_hist, f"{plots_dir}/09_nn_training_accuracy.png")
+    plot_nn_accuracy_per_epoch(
+        nn_hist,
+        f"{plots_dir}/09_nn_training_accuracy.png",
+        optimizer=best_opt,
+        params={'lr': best_lr_nn, 'reg': best_reg_nn, 'hidden': best_hidden}
+    )
 
     plot_confusion_matrix(y_test_nn, y_test_pred_nn, "Neural Network Confusion Matrix",
                           f"{plots_dir}/10_nn_confusion_matrix.png")
@@ -414,7 +419,7 @@ def main():
     if USE_EXPERIMENT_TRACKING:
         # Name that sucker
         # None for auto-generated
-        experiment_name = 'nn_optimization_R001'
+        experiment_name = 'nn_optimization_R002'
         plot_manager = create_plot_manager(base_dir=PLOTS_DIR, experiment_name=experiment_name, enabled=True)
         plots_dir = plot_manager.get_plots_dir()
 

@@ -117,6 +117,7 @@ class PlotManager:
                 json.dump(self.metadata, f, indent=2)
             print(f"Saved experiment metadata to {filepath}")
 
+
     def create_comparison_table(self):
         """Generate a markdown comparison table of all models"""
         if not self.enabled or not self.metadata['results']:
@@ -124,7 +125,20 @@ class PlotManager:
 
         lines = ["# Experiment Results\n"]
         lines.append(f"**Experiment:** {self.experiment_name}\n")
-        lines.append(f"**Date:** {self.metadata['timestamp']}\n\n")
+
+        ts = self.metadata.get('timestamp')
+        # ts may be a string (iso format) or a datetime if someone sets it manually
+        if isinstance(ts, str):
+            try:
+                dt = datetime.fromisoformat(ts)
+            except ValueError:
+                dt = datetime.now()
+        else:
+            dt = ts or datetime.now()
+
+        formatted_time = dt.strftime('%Y-%m-%dT%H:%M')
+        lines.append(f"**Date:** {formatted_time}\n\n")
+
         lines.append("## Model Comparison\n")
         lines.append("| Model | Test Accuracy | Best Hyperparameters |")
         lines.append("|-------|---------------|---------------------|")
@@ -133,16 +147,13 @@ class PlotManager:
             acc = results.get('test_accuracy', 'N/A')
             if isinstance(acc, float):
                 acc = f"{acc:.2f}%"
-
             params = results.get('best_params', {})
             param_str = ', '.join([f"{k}={v}" for k, v in params.items()])
-
             lines.append(f"| {model_name} | {acc} | {param_str} |")
 
         filepath = os.path.join(self.experiment_dir, 'results_summary.md')
         with open(filepath, 'w') as f:
             f.write('\n'.join(lines))
-
         print(f"Saved results summary to {filepath}")
 
 

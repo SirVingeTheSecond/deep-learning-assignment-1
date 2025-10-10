@@ -178,7 +178,7 @@ def plot_linear_classifier_learned_weights(plots_dir, model_type, weights):
     for i in range(W.shape[0]):
         img = W[i].reshape(28, 28, 3)
         row, col = divmod(i, 4)
-        ax[row, col].imshow(img * 10)  # Scale color up a bit
+        ax[row, col].imshow(img * 6)  # Scale color up a bit
         ax[row, col].set_title(CLASS_NAMES[i], fontsize=10)
         ax[row, col].axis('off')
 
@@ -468,14 +468,22 @@ def plot_nn_training_loss(history, filepath):
     _save_and_close(filepath)
 
 
-def plot_nn_accuracy_per_epoch(history, filepath):
+def plot_nn_accuracy_per_epoch(history, filepath, optimizer=None, params=None):
     """Plot training and validation accuracy per epoch"""
     if len(history['train_acc_history']) > 0:
         plt.figure(figsize=(8, 4))
         plt.plot(history['train_acc_history'], label='train')
         if len(history['val_acc_history']):
             plt.plot(history['val_acc_history'], label='val')
-        plt.title('Accuracy per epoch')
+
+        title = 'Accuracy per epoch'
+        if optimizer:
+            title += f' (Optimizer: {optimizer}'
+            if params:
+                title += f', LR: {params.get("lr", "?")}, Reg: {params.get("reg", "?")}'
+            title += ')'
+
+        plt.title(title)
         plt.xlabel('Epoch')
         plt.ylabel('Accuracy')
         plt.legend()
