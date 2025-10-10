@@ -176,7 +176,7 @@ def run_linear_classifiers(X_train, y_train, X_val, y_val, X_test, y_test, plots
         print(f"\nBest {loss_type.capitalize()}: lr={lr}, reg={reg} ({best_val * 100:.2f}%)\n")
         print(results)
 
-        #plot_linear_classifier_hyperparameters(plots_dir, results, loss_type)
+        plot_linear_classifier_hyperparameters(plots_dir, results, loss_type)
         return clf, lr, reg, best_hist
 
     # SVM

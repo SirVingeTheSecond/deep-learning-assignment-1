@@ -44,7 +44,7 @@ LINEAR_LEARNING_RATES = [1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1]
 LINEAR_REGULARIZATIONS = [1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1]
 LINEAR_NUM_ITERS = 200
 LINEAR_BATCH_SIZE = 1000
-LINEAR_PRINT_EVERY = 10
+LINEAR_PRINT_EVERY = 201
 
 # Neural network hyperparameters for grid search
 NN_HIDDEN_SIZES = [100, 200, 500]
