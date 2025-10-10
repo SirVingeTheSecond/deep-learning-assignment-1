@@ -30,6 +30,7 @@ from data import load_data
 from k_nearest_neighbor import KNearestNeighbor
 from linear_classifier import LinearClassifier
 from neural_network import FullyConnectedNN, load_data_nn
+from plot_manager import create_plot_manager
 from plot import (
     plot_class_distribution,
     plot_knn_validation_and_class_distribution,
@@ -37,11 +38,19 @@ from plot import (
     plot_linear_classifier_learned_weights,
     plot_training_curves,
     plot_confusion_matrix,
-    plot_nn_hyperparameter_results,
     plot_model_comparison,
     visualize_nn_weights,
+    visualize_nn_weights_comparison,
+    visualize_nn_weights_simple,
     plot_nn_training_loss,
     plot_nn_accuracy_per_epoch,
+    plot_nn_hyperparameter_results,
+    plot_nn_all_surfaces,
+    # ToDo
+    plot_per_class_accuracy,
+    plot_optimizer_convergence,
+    plot_overfitting_analysis,
+    plot_nn_heatmap,
 )
 
 np.random.seed(SEED)
@@ -358,7 +367,8 @@ def run_neural_network(X_train_nn, y_train_nn, X_val_nn, y_val_nn, X_test_nn, y_
     plot_confusion_matrix(y_test_nn, y_test_pred_nn, "Neural Network Confusion Matrix",
                           f"{plots_dir}/10_nn_confusion_matrix.png")
 
-    visualize_nn_weights(nn_model, f"{plots_dir}/11_nn_learned_weights.png")
+    visualize_nn_weights(nn_model, plots_dir)
+    visualize_nn_weights_comparison(nn_model, plots_dir)
 
     print("\nPer-class accuracy on test set:")
     for i, class_name in enumerate(CLASS_NAMES):
@@ -398,8 +408,33 @@ def run_neural_network(X_train_nn, y_train_nn, X_val_nn, y_val_nn, X_test_nn, y_
 
 
 def main():
-    plots_dir = PLOTS_DIR
-    os.makedirs(plots_dir, exist_ok=True)
+    # Set enabled=True to track the experiment
+    USE_EXPERIMENT_TRACKING = True
+
+    if USE_EXPERIMENT_TRACKING:
+        # Name that sucker
+        # None for auto-generated
+        experiment_name = 'nn_optimization_R001'
+        plot_manager = create_plot_manager(base_dir=PLOTS_DIR, experiment_name=experiment_name, enabled=True)
+        plots_dir = plot_manager.get_plots_dir()
+
+        plot_manager.save_config({
+            'seed': SEED,
+            'data_size': DATA_SIZE,
+            'subsample_train': SUBSAMPLE_TRAIN,
+            'subsample_val': SUBSAMPLE_VAL,
+            'knn_k_values': KNN_K_VALUES,
+            'linear_lrs': LINEAR_LEARNING_RATES,
+            'linear_regs': LINEAR_REGULARIZATIONS,
+            'nn_hidden_sizes': NN_HIDDEN_SIZES,
+            'nn_lrs': NN_LEARNING_RATES,
+            'nn_regs': NN_REGULARIZATIONS,
+            'nn_optimizers': NN_OPTIMIZERS
+        })
+    else:
+        plots_dir = PLOTS_DIR
+        os.makedir(plots_dir, exist_ok=True)
+        plot_manager = None
 
     print("Loading data...")
     X_train, y_train, X_val, y_val, X_test, y_test = load_data(size=DATA_SIZE, subsample_train=SUBSAMPLE_TRAIN)
@@ -438,6 +473,12 @@ def main():
             plots_dir, num_classes
         )
 
+        # Is this check redundant?
+        if 'nn' in results and 'all_results' in results['nn']:
+            print('\nCreating neural network hyperparameter surface plots...')
+            plot_nn_all_surfaces(results['nn']['all_results'], plots_dir)
+
+
     # Comparison (only if at least 2 models were run)
     if sum(config.values()) >= 2:
         print("\n" + "=" * 60)
@@ -463,6 +504,16 @@ def main():
                 results['nn']['test_accuracy'],
                 plots_dir
             )
+
+    if USE_EXPERIMENT_TRACKING and plot_manager:
+        for model_name, model_results in results.items():
+            if isinstance(model_results, dict) and 'test_accuracy' in model_results:
+                plot_manager.save_results(model_name, {
+                    'test_accuracy': model_results['test_accuracy'],
+                    'best_params': model_results.get('best_params', {})
+                })
+        plot_manager.save_metadata()
+        plot_manager.create_comparison_table()
 
     print("\nDone!")
 

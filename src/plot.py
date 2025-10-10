@@ -4,11 +4,42 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix
 from math import ceil, sqrt
 from scipy.interpolate import griddata
+import os
 
 from config import CLASS_NAMES, LINEAR_LEARNING_RATES, LINEAR_REGULARIZATIONS
 
+
+# HELPER FUNCTIONS
+
+def _ensure_plot_dir(filepath):
+    """Internal helper to ensure directory exists before saving plot"""
+    directory = os.path.dirname(filepath)
+    if directory:
+        os.makedirs(directory, exist_ok=True)
+
+
+def _save_and_close(filepath, dpi=300):
+    """
+    Consistently save and close plots with proper error handling.
+
+    Args:
+        filepath: Full path to save the plot
+        dpi: Resolution for saved image (default: 300)
+    """
+    _ensure_plot_dir(filepath)
+    plt.tight_layout()
+    plt.savefig(filepath, dpi=dpi, bbox_inches='tight')
+    plt.close()
+    print(f"Saved plot: {filepath}")
+
+
+# ============================================================================
+# GENERAL
+# ============================================================================
+
 def plot_class_distribution(plots_dir, y_train, y_test, y_val):
-    plt.plot()
+    """Plot class distribution across train, test, and validation sets"""
+    plt.figure()
     train_classes, train_counts = np.unique(y_train, return_counts=True)
     test_classes, test_counts = np.unique(y_test, return_counts=True)
     val_classes, val_counts = np.unique(y_val, return_counts=True)
@@ -22,7 +53,6 @@ def plot_class_distribution(plots_dir, y_train, y_test, y_val):
     plt.bar(x - width * 1.1, train_percentages, width, label='Training', alpha=0.8)
     plt.bar(x, test_percentages, width, label='Test', alpha=0.8)
     plt.bar(x + width * 1.1, val_percentages, width, label='Validation', alpha=0.8)
-    
 
     plt.xlabel('Class')
     plt.ylabel('Percentage (%)')
@@ -31,14 +61,41 @@ def plot_class_distribution(plots_dir, y_train, y_test, y_val):
     plt.legend()
     plt.grid(True, alpha=0.3, axis='y')
 
-    plt.tight_layout()
-    out = f"{plots_dir}/dataset_class_distribution.png"
-    plt.savefig(out, dpi=300, bbox_inches='tight')
-    plt.close()
+    _save_and_close(f"{plots_dir}/dataset_class_distribution.png")
+
+
+def plot_confusion_matrix(y_true, y_pred, title, filepath):
+    """Create and save confusion matrix visualization"""
+    cm = confusion_matrix(y_true, y_pred, normalize='true')
+    plt.figure(figsize=(10, 8))
+    plt.imshow(cm, cmap='Blues')
+    plt.title(title)
+    plt.colorbar()
+
+    tick_labels = [c[:8] for c in CLASS_NAMES]
+    plt.xticks(range(len(CLASS_NAMES)), tick_labels, rotation=45, ha='right')
+    plt.yticks(range(len(CLASS_NAMES)), tick_labels)
+
+    # Add text annotations
+    for i in range(len(CLASS_NAMES)):
+        for j in range(len(CLASS_NAMES)):
+            plt.text(j, i, str(round(cm[i, j], 2)), ha='center', va='center',
+                     color='white' if cm[i, j] > cm.max() / 2 else 'black')
+
+    plt.xlabel('Predicted Label')
+    plt.ylabel('True Label')
+
+    _save_and_close(filepath)
+
+
+# ============================================================================
+# K-NEAREST NEIGHBORS
+# ============================================================================
 
 def plot_knn_validation_and_class_distribution(
         plots_dir, k_values, acc_L2, acc_L1, best_params, y_train, y_test
 ):
+    """Plot kNN validation accuracy for different k values and distance metrics"""
     plt.figure(figsize=(18, 6))
 
     # Left: L1/L2 validation accuracy vs k
@@ -104,14 +161,15 @@ def plot_knn_validation_and_class_distribution(
     plt.legend()
     plt.grid(True, alpha=0.3, axis='y')
 
-    plt.tight_layout()
-    out = f"{plots_dir}/01_knn_validation_accuracy.png"
-    plt.savefig(out, dpi=300, bbox_inches='tight')
-    plt.close()
-    print(f"Saved plot: {out}")
+    _save_and_close(f"{plots_dir}/01_knn_validation_accuracy.png")
 
+
+# ============================================================================
+# LINEAR CLASSIFIER
+# ============================================================================
 
 def plot_linear_classifier_learned_weights(plots_dir, model_type, weights):
+    """Visualize learned weights for linear classifiers in 2x4 grid"""
     # Remove bias and transpose if needed
     W = weights.transpose()[:, :-1]  # shape: (num_classes, input_dim)
 
@@ -119,34 +177,30 @@ def plot_linear_classifier_learned_weights(plots_dir, model_type, weights):
 
     for i in range(W.shape[0]):
         img = W[i].reshape(28, 28, 3)
-
-        row, col = divmod(i, 4)  # Determine position in 2x4 grid
+        row, col = divmod(i, 4)
         ax[row, col].imshow(img * 10)  # Scale color up a bit
         ax[row, col].set_title(CLASS_NAMES[i], fontsize=10)
         ax[row, col].axis('off')
 
-    # Add a main title for the figure
     fig.suptitle(f"Learned Weights for {model_type} Classifier", fontsize=14)
 
-    plt.tight_layout()
-    out = f"{plots_dir}/linear_{model_type}_weights_visualized.png"
-    plt.savefig(out, dpi=300, bbox_inches='tight')
-    plt.close()
+    _save_and_close(f"{plots_dir}/linear_{model_type}_weights_visualized.png")
+
 
 def plot_linear_classifier_hyperparameters(plots_dir, results, loss_type):
+    """Create hyperparameter surface plot for linear classifiers"""
     # Extract columns
-    x = np.array([r[0] for r in results])   # e.g. 0.0001, 0.0005, 0.001
-    y = np.array([r[1] for r in results])   # e.g. 1, 2
-    z = np.array([r[2] for r in results])   # your score
+    x = np.array([r[0] for r in results])  # learning rates
+    y = np.array([r[1] for r in results])  # regularizations
+    z = np.array([r[2] for r in results])  # accuracies
 
-    # Interpolate in log-space for X
+    # Interpolate in log-space
     log_x = np.log10(x)
     log_y = np.log10(y)
     xi = np.linspace(log_x.min(), log_x.max(), 200)
     yi = np.linspace(log_y.min(), log_y.max(), 200)
     Xi, Yi = np.meshgrid(xi, yi)
 
-    # Interpolate using linear method
     Zi = griddata((log_x, log_y), z, (Xi, Yi), method='linear')
 
     fig, ax = plt.subplots()
@@ -158,12 +212,12 @@ def plot_linear_classifier_hyperparameters(plots_dir, results, loss_type):
         origin='lower',
         cmap='plasma',
         aspect='auto',
-        vmin=1/8,
+        vmin=1 / 8,
         vmax=1
     )
 
     # Overlay original scatter points
-    sc = ax.scatter(log_x, log_y, c=z, cmap='plasma', edgecolor='black', s=100, vmin=1/8, vmax=1)
+    sc = ax.scatter(log_x, log_y, c=z, cmap='plasma', edgecolor='black', s=100, vmin=1 / 8, vmax=1)
 
     best_idx = np.argmax(z)
     ax.scatter(log_x[best_idx], log_y[best_idx], s=200, edgecolor='yellow', facecolor='none', linewidth=2)
@@ -171,12 +225,12 @@ def plot_linear_classifier_hyperparameters(plots_dir, results, loss_type):
     # Colorbar
     plt.colorbar(im, ax=ax, label='Validation Accuracy')
 
-    # Log-scale ticks: convert back to actual learning rate values
+    # Log-scale ticks
     x_ticks = np.array(LINEAR_LEARNING_RATES)
     ax.set_xticks(np.log10(x_ticks))
     ax.set_xticklabels(["{:.0e}".format(v) for v in x_ticks])
 
-    y_ticks = np.array(LINEAR_REGULARIZATIONS) 
+    y_ticks = np.array(LINEAR_REGULARIZATIONS)
     ax.set_yticks(np.log10(y_ticks))
     ax.set_yticklabels(["{:.0e}".format(v) for v in y_ticks])
 
@@ -184,12 +238,11 @@ def plot_linear_classifier_hyperparameters(plots_dir, results, loss_type):
     plt.ylabel("Regularization Strength")
     plt.title(f"Hyperparameter Surface ({loss_type})")
 
-    out = f"{plots_dir}/08_linear_hyperparam_results_{loss_type}.png"
-    plt.savefig(out, dpi=300, bbox_inches='tight')
-    plt.show()
-    plt.close()
+    _save_and_close(f"{plots_dir}/08_linear_hyperparam_results_{loss_type}.png")
 
-def plot_training_curves(hist, title, filename):
+
+def plot_training_curves(hist, title, filepath):
+    """Plot training loss and accuracy curves"""
     plt.figure(figsize=(7, 4))
 
     if "loss_history" in hist and len(hist["loss_history"]) > 0:
@@ -218,41 +271,221 @@ def plot_training_curves(hist, title, filename):
     plt.title(title)
     plt.legend()
     plt.grid(True, alpha=0.3)
-    plt.tight_layout()
-    plt.savefig(filename, dpi=300, bbox_inches='tight')
-    plt.close()
-    print(f"Saved plot: {filename}")
+
+    _save_and_close(filepath)
 
 
-def plot_confusion_matrix(y_true, y_pred, title, filename):
-    cm = confusion_matrix(y_true, y_pred, normalize='true')
-    plt.figure(figsize=(10, 8))
-    plt.imshow(cm, cmap='Blues')
-    plt.title(title)
-    plt.colorbar()
+# ============================================================================
+# MODEL COMPARISON
+# ============================================================================
 
-    tick_labels = [c[:8] for c in CLASS_NAMES]
-    plt.xticks(range(len(CLASS_NAMES)), tick_labels, rotation=45, ha='right')
-    plt.yticks(range(len(CLASS_NAMES)), tick_labels)
+def plot_model_comparison(knn_acc, svm_acc, softmax_acc, nn_acc, plots_dir):
+    """Create a bar chart comparing all models"""
+    models = ['kNN', 'SVM', 'Softmax', 'Neural Network']
+    accuracies = [knn_acc, svm_acc, softmax_acc, nn_acc]
 
-    # Add text annotations
-    for i in range(len(CLASS_NAMES)):
-        for j in range(len(CLASS_NAMES)):
-            plt.text(j, i, str(round(cm[i, j], 2)), ha='center', va='center',
-                     color='white' if cm[i, j] > cm.max() / 2 else 'black')
+    fig, ax = plt.subplots(figsize=(10, 6))
 
-    plt.xlabel('Predicted Label')
-    plt.ylabel('True Label')
-    plt.tight_layout()
-    plt.savefig(filename, dpi=300, bbox_inches='tight')
-    plt.close()
-    print(f"Saved plot: {filename}")
+    colors = ['#3498db', '#e74c3c', '#2ecc71', '#f39c12']
+    bars = ax.bar(models, accuracies, color=colors, alpha=0.8, edgecolor='black', linewidth=1.5)
+
+    # Add value labels on bars
+    for bar, acc in zip(bars, accuracies):
+        height = bar.get_height()
+        ax.text(bar.get_x() + bar.get_width() / 2., height + 0.5,
+                f'{acc:.2f}%', ha='center', va='bottom', fontsize=12, fontweight='bold')
+
+    ax.set_ylabel('Test Accuracy (%)', fontsize=12)
+    ax.set_title('Model Comparison on Test Set', fontsize=14, fontweight='bold')
+    ax.set_ylim([0, max(accuracies) + 5])
+    ax.grid(True, alpha=0.3, axis='y')
+
+    # Highlight best model
+    best_idx = accuracies.index(max(accuracies))
+    bars[best_idx].set_edgecolor('gold')
+    bars[best_idx].set_linewidth(3)
+
+    _save_and_close(f"{plots_dir}/12_model_comparison.png")
+
+
+# ============================================================================
+# NEURAL NETWORK
+# ============================================================================
+
+def visualize_grid(Xs, ubound=255.0, padding=1):
+    """
+    Reshape a 4D tensor of image data to a grid for visualization.
+
+    Args:
+        Xs: Data of shape (N, H, W, C)
+        ubound: Output grid will have values scaled to the range [0, ubound]
+        padding: The number of blank pixels between elements of the grid
+
+    Returns:
+        grid: Grid representation of images
+    """
+    (N, H, W, C) = Xs.shape
+    grid_size = int(ceil(sqrt(N)))
+    grid_height = H * grid_size + padding * (grid_size - 1)
+    grid_width = W * grid_size + padding * (grid_size - 1)
+    grid = np.zeros((grid_height, grid_width, C))
+    next_idx = 0
+    y0, y1 = 0, H
+    for y in range(grid_size):
+        x0, x1 = 0, W
+        for x in range(grid_size):
+            if next_idx < N:
+                img = Xs[next_idx]
+                low, high = np.min(img), np.max(img)
+                grid[y0:y1, x0:x1] = ubound * (img - low) / (high - low)
+                next_idx += 1
+            x0 += W + padding
+            x1 += W + padding
+        y0 += H + padding
+        y1 += H + padding
+    return grid
+
+def visualize_nn_weights(net, plots_dir):
+    """
+    Visualize the learned weights of the neural network comprehensively.
+    Creates a combined visualization showing both first and second layer weights.
+    """
+    fig = plt.figure(figsize=(18, 14))
+
+    # ============================================================
+    # PLOT 1: First Layer Weights (Feature Detectors)
+    # ============================================================
+    # Use a 4x4 grid, with top row spanning all columns
+    ax1 = plt.subplot2grid((4, 4), (0, 0), colspan=4)
+    W1 = net.params['W1']
+    W1_reshaped = W1.reshape(3, 28, 28, -1).transpose(3, 1, 2, 0)
+
+    # Show a grid of the first layer features
+    grid_img = visualize_grid(W1_reshaped, padding=3)
+    ax1.imshow(grid_img.astype('uint8'))
+    ax1.set_title('First Layer Weights (Feature Detectors)',
+                  fontsize=14, fontweight='bold', pad=20)
+    ax1.axis('off')
+
+    # Add text explaining what we're seeing
+    n_features = W1_reshaped.shape[0]
+    ax1.text(0.5, -0.05,
+             f'Showing {n_features} learned feature detectors from input layer',
+             transform=ax1.transAxes, ha='center', fontsize=10, style='italic')
+
+    # Add title for second section
+    fig.text(0.5, 0.42, 'Output Layer Weights (Class-Specific Patterns)',
+             ha='center', fontsize=14, fontweight='bold')
+    fig.text(0.5, 0.39,
+             'Reconstructed input space patterns emphasized by each class',
+             ha='center', fontsize=10, style='italic')
+
+    # ============================================================
+    # PLOT 2: Second Layer Weights (Class-Specific) - 2 rows x 4 cols
+    # ============================================================
+    W2 = net.params['W2']  # Shape: (hidden_size, num_classes)
+
+    for i in range(min(8, W2.shape[1])):
+        row = 2 + (i // 4)  # Start from row 2, two rows for 8 classes
+        col = i % 4
+        ax = plt.subplot2grid((4, 4), (row, col))
+
+        # Get weights for this class from hidden layer
+        class_weights = W2[:, i]
+
+        # Reshape back through W1 to see what each class emphasizes in input space
+        reconstructed = np.dot(net.params['W1'], class_weights)
+        img = reconstructed.reshape(28, 28, 3)
+
+        # Normalize for visualization
+        img_norm = (img - img.min()) / (img.max() - img.min() + 1e-8)
+
+        ax.imshow(img_norm)
+        ax.set_title(CLASS_NAMES[i], fontsize=10, fontweight='bold')
+        ax.axis('off')
+
+    plt.tight_layout(rect=[0, 0, 1, 0.96])
+    _save_and_close(f"{plots_dir}/11_nn_learned_weights_comprehensive.png")
+
+def visualize_nn_weights_comparison(net, plots_dir):
+    """
+    Create a direct comparison visualization matching the linear classifier format.
+    Shows only the output layer weights in the same 2x4 grid as linear classifiers.
+    """
+    fig, axes = plt.subplots(2, 4, figsize=(12, 6))
+
+    W2 = net.params['W2']  # Shape: (hidden_size, num_classes)
+
+    for i in range(8):
+        row, col = divmod(i, 4)
+        ax = axes[row, col]
+
+        # Get weights for this class
+        class_weights = W2[:, i]
+
+        # Reconstruct what this class "sees" in input space
+        reconstructed = np.dot(net.params['W1'], class_weights)
+        img = reconstructed.reshape(28, 28, 3)
+
+        # Normalize and scale similar to linear classifier visualization
+        img_norm = (img - img.min()) / (img.max() - img.min() + 1e-8)
+
+        ax.imshow(img_norm * 255)  # Scale to match linear classifier
+        ax.set_title(CLASS_NAMES[i], fontsize=10)
+        ax.axis('off')
+
+    fig.suptitle("Neural Network Output Layer Weights (Class-Specific)",
+                 fontsize=14, fontweight='bold')
+
+    _save_and_close(f"{plots_dir}/11b_nn_weights_linear_comparison.png")
+
+
+def visualize_nn_weights_simple(net, filepath):
+    """
+    Simple visualization of first layer weights only.
+    Maintains backward compatibility with existing code.
+    """
+    W1 = net.params['W1']
+    W1 = W1.reshape(3, 28, 28, -1).transpose(3, 1, 2, 0)
+
+    plt.figure(figsize=(10, 10))
+    plt.imshow(visualize_grid(W1, padding=3).astype('uint8'))
+    plt.title('Learned Weights of First Hidden Layer', fontsize=14, fontweight='bold')
+    plt.gca().axis('off')
+
+    _save_and_close(filepath)
+
+
+def plot_nn_training_loss(history, filepath):
+    """Plot training loss over iterations"""
+    plt.figure(figsize=(8, 4))
+    plt.plot(history['loss_history'])
+    plt.title('Training loss')
+    plt.xlabel('Iteration')
+    plt.ylabel('Loss')
+    plt.grid(True)
+
+    _save_and_close(filepath)
+
+
+def plot_nn_accuracy_per_epoch(history, filepath):
+    """Plot training and validation accuracy per epoch"""
+    if len(history['train_acc_history']) > 0:
+        plt.figure(figsize=(8, 4))
+        plt.plot(history['train_acc_history'], label='train')
+        if len(history['val_acc_history']):
+            plt.plot(history['val_acc_history'], label='val')
+        plt.title('Accuracy per epoch')
+        plt.xlabel('Epoch')
+        plt.ylabel('Accuracy')
+        plt.legend()
+        plt.grid(True)
+
+        _save_and_close(filepath)
 
 
 def plot_nn_hyperparameter_results(results_list, plots_dir):
-    """
-    Visualize neural network hyperparameter tuning results.
-    """
+    """Visualize neural network hyperparameter tuning results in a 2x3 grid"""
     fig = plt.figure(figsize=(18, 12))
 
     # Extract unique values
@@ -368,133 +601,215 @@ def plot_nn_hyperparameter_results(results_list, plots_dir):
     ax6.legend()
     ax6.grid(True, alpha=0.3, axis='y')
 
-    plt.tight_layout()
-    out = f"{plots_dir}/07_nn_hyperparameter_tuning.png"
-    plt.savefig(out, dpi=300, bbox_inches='tight')
-    plt.close()
-    print(f"Saved plot: {out}")
+    _save_and_close(f"{plots_dir}/07_nn_hyperparameter_tuning.png")
 
 
-def plot_model_comparison(knn_acc, svm_acc, softmax_acc, nn_acc, plots_dir):
+def plot_nn_hyperparameter_surfaces(results_list, plots_dir):
     """
-    Create a bar chart comparing all models
+    Create hyperparameter surface plots for neural networks.
+    Shows LR vs Reg interaction for each optimizer.
     """
-    models = ['kNN', 'SVM', 'Softmax', 'Neural Network']
-    accuracies = [knn_acc, svm_acc, softmax_acc, nn_acc]
+    optimizers = sorted(set(r['opt'] for r in results_list))
 
-    fig, ax = plt.subplots(figsize=(10, 6))
+    # Create a figure with subplots for each optimizer
+    n_opts = len(optimizers)
+    fig, axes = plt.subplots(1, n_opts, figsize=(6 * n_opts, 5))
 
-    colors = ['#3498db', '#e74c3c', '#2ecc71', '#f39c12']
-    bars = ax.bar(models, accuracies, color=colors, alpha=0.8, edgecolor='black', linewidth=1.5)
+    if n_opts == 1:
+        axes = [axes]
 
-    # Add value labels on bars
-    for bar, acc in zip(bars, accuracies):
-        height = bar.get_height()
-        ax.text(bar.get_x() + bar.get_width() / 2., height + 0.5,
-                f'{acc:.2f}%', ha='center', va='bottom', fontsize=12, fontweight='bold')
+    for idx, opt in enumerate(optimizers):
+        ax = axes[idx]
 
-    ax.set_ylabel('Test Accuracy (%)', fontsize=12)
-    ax.set_title('Model Comparison on Test Set', fontsize=14, fontweight='bold')
-    ax.set_ylim([0, max(accuracies) + 5])
-    ax.grid(True, alpha=0.3, axis='y')
+        # Filter results for this optimizer
+        opt_results = [r for r in results_list if r['opt'] == opt]
 
-    # Highlight best model
-    best_idx = accuracies.index(max(accuracies))
-    bars[best_idx].set_edgecolor('gold')
-    bars[best_idx].set_linewidth(3)
+        if not opt_results:
+            continue
 
-    plt.tight_layout()
-    out = f"{plots_dir}/12_model_comparison.png"
-    plt.savefig(out, dpi=300, bbox_inches='tight')
-    plt.close()
-    print(f"Saved plot: {out}")
+        # Extract data
+        x = np.array([r['lr'] for r in opt_results])
+        y = np.array([r['reg'] for r in opt_results])
+        z = np.array([r['val_acc'] * 100 for r in opt_results])
+
+        # Create grid for interpolation
+        log_x = np.log10(x)
+        log_y = np.log10(y)
+        xi = np.linspace(log_x.min(), log_x.max(), 200)
+        yi = np.linspace(log_y.min(), log_y.max(), 200)
+        Xi, Yi = np.meshgrid(xi, yi)
+
+        # Interpolate
+        Zi = griddata((log_x, log_y), z, (Xi, Yi), method='linear')
+
+        # Plot gradient background
+        im = ax.imshow(
+            Zi,
+            extent=(log_x.min(), log_x.max(), log_y.min(), log_y.max()),
+            origin='lower',
+            cmap='plasma',
+            aspect='auto',
+            vmin=max(z.min() - 5, 0),
+            vmax=min(z.max() + 5, 100)
+        )
+
+        # Overlay scatter points
+        sc = ax.scatter(log_x, log_y, c=z, cmap='plasma',
+                        edgecolor='black', s=100,
+                        vmin=max(z.min() - 5, 0),
+                        vmax=min(z.max() + 5, 100))
+
+        # Highlight best point
+        best_idx = np.argmax(z)
+        ax.scatter(log_x[best_idx], log_y[best_idx],
+                   s=200, edgecolor='yellow', facecolor='none',
+                   linewidth=2, label=f'Best: {z[best_idx]:.2f}%')
+
+        # Get unique learning rates and regularizations for ticks
+        unique_lrs = sorted(set(r['lr'] for r in opt_results))
+        unique_regs = sorted(set(r['reg'] for r in opt_results))
+
+        ax.set_xticks(np.log10(unique_lrs))
+        ax.set_xticklabels([f'{lr:.0e}' for lr in unique_lrs], rotation=45)
+        ax.set_yticks(np.log10(unique_regs))
+        ax.set_yticklabels([f'{reg:.0e}' for reg in unique_regs])
+
+        ax.set_xlabel('Learning Rate (log scale)')
+        ax.set_ylabel('Regularization Strength (log scale)')
+        ax.set_title(f'Optimizer: {opt}')
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+
+        # Add colorbar
+        plt.colorbar(im, ax=ax, label='Validation Accuracy (%)')
+
+    _save_and_close(f"{plots_dir}/07b_nn_hyperparameter_surfaces.png")
 
 
-def visualize_grid(Xs, ubound=255.0, padding=1):
+def plot_nn_hidden_size_surfaces(results_list, plots_dir):
     """
-    Reshape a 4D tensor of image data to a grid to visualize.
-
-    Inputs:
-    - Xs: Data of shape (N, H, W, C)
-    - ubound: Output grid will have values scaled to the range [0, ubound]
-    - padding: The number of blank pixels between elements of the grid
+    Create surface plots showing Hidden Size vs Learning Rate and vs Regularization
+    for the best performing optimizer.
     """
-    (N, H, W, C) = Xs.shape
-    grid_size = int(ceil(sqrt(N)))
-    grid_height = H * grid_size + padding * (grid_size - 1)
-    grid_width = W * grid_size + padding * (grid_size - 1)
-    grid = np.zeros((grid_height, grid_width, C))
-    next_idx = 0
-    y0, y1 = 0, H
-    for y in range(grid_size):
-        x0, x1 = 0, W
-        for x in range(grid_size):
-            if next_idx < N:
-                img = Xs[next_idx]
-                low, high = np.min(img), np.max(img)
-                grid[y0:y1, x0:x1] = ubound * (img - low) / (high - low)
-                next_idx += 1
-            x0 += W + padding
-            x1 += W + padding
-        y0 += H + padding
-        y1 += H + padding
-    return grid
+    # Find best optimizer
+    best_opt = max(set(r['opt'] for r in results_list),
+                   key=lambda opt: np.mean([r['val_acc'] for r in results_list if r['opt'] == opt]))
+
+    opt_results = [r for r in results_list if r['opt'] == best_opt]
+
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+
+    # Plot 1: Hidden Size vs Learning Rate
+    ax1 = axes[0]
+
+    # Average over regularization values
+    hidden_lr_results = {}
+    for r in opt_results:
+        key = (r['hidden'], r['lr'])
+        if key not in hidden_lr_results:
+            hidden_lr_results[key] = []
+        hidden_lr_results[key].append(r['val_acc'] * 100)
+
+    x_data = [k[0] for k in hidden_lr_results.keys()]
+    y_data = [k[1] for k in hidden_lr_results.keys()]
+    z_data = [np.mean(v) for v in hidden_lr_results.values()]
+
+    x = np.array(x_data)
+    y = np.array(y_data)
+    z = np.array(z_data)
+
+    log_y = np.log10(y)
+    xi = np.linspace(x.min(), x.max(), 100)
+    yi = np.linspace(log_y.min(), log_y.max(), 100)
+    Xi, Yi = np.meshgrid(xi, yi)
+
+    Zi = griddata((x, log_y), z, (Xi, Yi), method='linear')
+
+    im1 = ax1.imshow(Zi, extent=(x.min(), x.max(), log_y.min(), log_y.max()),
+                     origin='lower', cmap='viridis', aspect='auto')
+    ax1.scatter(x, log_y, c=z, cmap='viridis', edgecolor='black', s=100)
+
+    best_idx = np.argmax(z)
+    ax1.scatter(x[best_idx], log_y[best_idx], s=200, edgecolor='yellow',
+                facecolor='none', linewidth=2)
+
+    unique_lrs = sorted(set(y_data))
+    ax1.set_yticks(np.log10(unique_lrs))
+    ax1.set_yticklabels([f'{lr:.0e}' for lr in unique_lrs])
+
+    ax1.set_xlabel('Hidden Layer Size')
+    ax1.set_ylabel('Learning Rate (log scale)')
+    ax1.set_title(f'Hidden Size vs LR (Optimizer: {best_opt})')
+    ax1.grid(True, alpha=0.3)
+    plt.colorbar(im1, ax=ax1, label='Validation Accuracy (%)')
+
+    # Plot 2: Hidden Size vs Regularization
+    ax2 = axes[1]
+
+    # Average over learning rate values
+    hidden_reg_results = {}
+    for r in opt_results:
+        key = (r['hidden'], r['reg'])
+        if key not in hidden_reg_results:
+            hidden_reg_results[key] = []
+        hidden_reg_results[key].append(r['val_acc'] * 100)
+
+    x_data = [k[0] for k in hidden_reg_results.keys()]
+    y_data = [k[1] for k in hidden_reg_results.keys()]
+    z_data = [np.mean(v) for v in hidden_reg_results.values()]
+
+    x = np.array(x_data)
+    y = np.array(y_data)
+    z = np.array(z_data)
+
+    log_y = np.log10(y)
+    xi = np.linspace(x.min(), x.max(), 100)
+    yi = np.linspace(log_y.min(), log_y.max(), 100)
+    Xi, Yi = np.meshgrid(xi, yi)
+
+    Zi = griddata((x, log_y), z, (Xi, Yi), method='linear')
+
+    im2 = ax2.imshow(Zi, extent=(x.min(), x.max(), log_y.min(), log_y.max()),
+                     origin='lower', cmap='viridis', aspect='auto')
+    ax2.scatter(x, log_y, c=z, cmap='viridis', edgecolor='black', s=100)
+
+    best_idx = np.argmax(z)
+    ax2.scatter(x[best_idx], log_y[best_idx], s=200, edgecolor='yellow',
+                facecolor='none', linewidth=2)
+
+    unique_regs = sorted(set(y_data))
+    ax2.set_yticks(np.log10(unique_regs))
+    ax2.set_yticklabels([f'{reg:.0e}' for reg in unique_regs])
+
+    ax2.set_xlabel('Hidden Layer Size')
+    ax2.set_ylabel('Regularization Strength (log scale)')
+    ax2.set_title(f'Hidden Size vs Reg (Optimizer: {best_opt})')
+    ax2.grid(True, alpha=0.3)
+    plt.colorbar(im2, ax=ax2, label='Validation Accuracy (%)')
+
+    _save_and_close(f"{plots_dir}/07c_nn_hidden_size_surfaces.png")
 
 
-def visualize_nn_weights(net, filename):
+def plot_nn_all_surfaces(results_list, plots_dir):
     """
-    Visualize the learned weights of the first layer of neural network
-    """
-    W1 = net.params['W1']
-    # Reshape weights to image format (28x28x3)
-    W1 = W1.reshape(3, 28, 28, -1).transpose(3, 1, 2, 0)
+    Convenience function to create all NN hyperparameter surface plots.
 
-    plt.figure(figsize=(10, 10))
-    plt.imshow(visualize_grid(W1, padding=3).astype('uint8'))
-    plt.title('Learned Weights of First Hidden Layer')
-    plt.gca().axis('off')
-    plt.tight_layout()
-    plt.savefig(filename, dpi=300, bbox_inches='tight')
-    plt.close()
-    print(f"Saved plot: {filename}")
-
-def plot_nn_training_loss(history, filename):
+    Args:
+        results_list: List of dicts with keys 'hidden', 'lr', 'reg', 'opt', 'val_acc'
+        plots_dir: Directory to save plots
     """
-    Plot training loss over iterations
-    """
-    plt.figure(figsize=(8, 4))
-    plt.plot(history['loss_history'])
-    plt.title('Training loss')
-    plt.xlabel('Iteration')
-    plt.ylabel('Loss')
-    plt.grid(True)
-    plt.tight_layout()
-    plt.savefig(filename, dpi=300, bbox_inches='tight')
-    plt.close()
-    print(f"Saved plot: {filename}")
+    print("Creating Neural Network hyperparameter surface plots...")
+    plot_nn_hyperparameter_surfaces(results_list, plots_dir)
+    plot_nn_hidden_size_surfaces(results_list, plots_dir)
+    print("Neural Network surface plots complete!")
 
-def plot_nn_accuracy_per_epoch(history, filename):
-    """
-    Plot training and validation accuracy per epoch
-    """
-    if len(history['train_acc_history']) > 0:
-        plt.figure(figsize=(8, 4))
-        plt.plot(history['train_acc_history'], label='train')
-        if len(history['val_acc_history']):
-            plt.plot(history['val_acc_history'], label='val')
-        plt.title('Accuracy per epoch')
-        plt.xlabel('Epoch')
-        plt.ylabel('Accuracy')
-        plt.legend()
-        plt.grid(True)
-        plt.tight_layout()
-        plt.savefig(filename, dpi=300, bbox_inches='tight')
-        plt.close()
-        print(f"Saved plot: {filename}")
 
-def plot_per_class_accuracy(y_true, y_pred, title, filename):
-    """Plot per-class accuracy as a bar chart"""
+# ============================================================================
+# MORE VISUALIZATION!
+# ============================================================================
 
+def plot_per_class_accuracy(y_true, y_pred, title, filepath):
+    """Plot per-class accuracy as a bar chart with distribution analysis"""
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
 
     accuracies = []
@@ -536,16 +851,16 @@ def plot_per_class_accuracy(y_true, y_pred, title, filename):
     ax2.set_title('Accuracy vs Class Distribution', fontsize=14, fontweight='bold')
     ax2.grid(True, alpha=0.3)
 
-    plt.tight_layout()
-    plt.savefig(filename, dpi=300, bbox_inches='tight')
-    plt.close()
-    print(f"Saved plot: {filename}")
+    _save_and_close(filepath)
 
 
 def plot_optimizer_convergence(results_dict, plots_dir):
     """
-    Compare convergence speed of different optimizers
-    Results_dict should have format: {optimizer: history_dict}
+    Compare convergence speed of different optimizers.
+
+    Args:
+        results_dict: Dict with format {optimizer: history_dict}
+        plots_dir: Directory to save plots
     """
     plt.figure(figsize=(15, 5))
 
@@ -587,12 +902,11 @@ def plot_optimizer_convergence(results_dict, plots_dir):
     plt.legend()
     plt.grid(True, alpha=0.3)
 
-    plt.tight_layout()
-    plt.savefig(f"{plots_dir}/13_optimizer_convergence.png", dpi=300, bbox_inches='tight')
-    plt.close()
+    _save_and_close(f"{plots_dir}/13_optimizer_convergence.png")
 
-def plot_overfitting_analysis(history, filename):
-    """Visualize overfitting through train-val gap"""
+
+def plot_overfitting_analysis(history, filepath):
+    """Visualize overfitting through train-val gap analysis"""
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
 
     epochs = range(1, len(history['train_acc_history']) + 1)
@@ -621,9 +935,7 @@ def plot_overfitting_analysis(history, filename):
     ax2.legend()
     ax2.grid(True, alpha=0.3, axis='y')
 
-    plt.tight_layout()
-    plt.savefig(filename, dpi=300, bbox_inches='tight')
-    plt.close()
+    _save_and_close(filepath)
 
 
 def plot_nn_heatmap(results_list, plots_dir):
@@ -661,6 +973,4 @@ def plot_nn_heatmap(results_list, plots_dir):
                      ha='center', va='center',
                      color='white' if matrix[i, j] < matrix.max() * 0.7 else 'black')
 
-    plt.tight_layout()
-    plt.savefig(f"{plots_dir}/14_nn_heatmap_{best_opt}.png", dpi=300, bbox_inches='tight')
-    plt.close()
+    _save_and_close(f"{plots_dir}/14_nn_heatmap_{best_opt}.png")
