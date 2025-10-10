@@ -24,12 +24,16 @@ class LinearClassifier:
         val_acc_history = []
 
         for it in range(num_iters):
+            indices = np.random.permutation(num_train)
+            X = X[indices]
+            y = y[indices]
+            
             # Sample minibatch
             x_batches = np.array_split(X, num_batches)
             y_batches = np.array_split(y, num_batches)
             avg_loss = 0
             for x_batch, y_batch in zip(x_batches, y_batches):
-                avg_loss = 0
+
                 if self.loss_type == 'softmax':
                     loss, gradient = softmax_loss(self.W, x_batch, y_batch, reg)
                 elif self.loss_type == 'svm':
@@ -45,8 +49,8 @@ class LinearClassifier:
                 print(str(it + 1) + "/" + str(num_iters) + " " + str(avg_loss / num_batches))
 
             # Check accuracy every epoch
-            train_pred = self.predict(x_batch)
-            train_acc = np.mean(train_pred == y_batch)
+            train_pred = self.predict(X)
+            train_acc = np.mean(train_pred == y)
             train_acc_history.append(train_acc)
 
             if X_val is not None and y_val is not None:

@@ -177,7 +177,8 @@ def plot_linear_classifier_learned_weights(plots_dir, model_type, weights):
 
     for i in range(W.shape[0]):
         img = W[i].reshape(28, 28, 3)
-        row, col = divmod(i, 4)
+
+        row, col = divmod(i, 4)  # Determine position in 2x4 grid
         ax[row, col].imshow(img * 6)  # Scale color up a bit
         ax[row, col].set_title(CLASS_NAMES[i], fontsize=10)
         ax[row, col].axis('off')
